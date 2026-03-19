@@ -1,6 +1,7 @@
 package com.haru.ocrkeyboard.service
 
 import android.view.View
+import android.view.KeyEvent
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
@@ -38,10 +39,17 @@ class OcrKeyboardService : LifecycleInputMethodService() {
         // ViewModelからのキーイベントの購読と送出
         lifecycleScope.launch {
             viewModel.keyEvent.collect { keyCode ->
-                val downEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, keyCode)
-                val upEvent = android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, keyCode)
-                currentInputConnection?.sendKeyEvent(downEvent)
-                currentInputConnection?.sendKeyEvent(upEvent)
+                val ic = currentInputConnection ?: return@collect
+                if (keyCode == KeyEvent.KEYCODE_DEL) {
+                    // Backspaceは KeyEvent を直接送るのが最も互換性が高い（選択範囲の削除などもOS/アプリ側で処理される）
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
+                } else {
+                    val downEvent = KeyEvent(KeyEvent.ACTION_DOWN, keyCode)
+                    val upEvent = KeyEvent(KeyEvent.ACTION_UP, keyCode)
+                    ic.sendKeyEvent(downEvent)
+                    ic.sendKeyEvent(upEvent)
+                }
             }
         }
     }
