@@ -1,0 +1,4 @@
+<resources>
+
+    <style name="Theme.OCRKeyboard" parent="Theme.MaterialComponents.Light" />
+</resources>
