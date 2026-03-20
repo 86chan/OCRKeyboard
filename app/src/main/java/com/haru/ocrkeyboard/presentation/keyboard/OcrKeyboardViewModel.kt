@@ -25,29 +25,26 @@ class OcrKeyboardViewModel(
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
+    /** 内部保持用のUI状態 */
     private val _state = MutableStateFlow(OcrKeyboardState())
     
-    /**
-     * 公開用のUI状態フロー
-     */
+    /** 公開用のUI状態フロー */
     val state: StateFlow<OcrKeyboardState> = _state.asStateFlow()
 
+    /** 内部保持用のテキスト入力イベントストリーム */
     private val _commitTextEvent = MutableSharedFlow<String>()
 
-    /**
-     * IMEへのテキスト入力イベント
-     */
+    /** IMEへのテキスト入力イベント */
     val commitTextEvent: SharedFlow<String> = _commitTextEvent.asSharedFlow()
 
+    /** 内部保持用のキーコード送出イベントストリーム */
     private val _keyEvent = MutableSharedFlow<Int>()
 
-    /**
-     * IMEへのキー送出イベント（KeyCode）
-     */
+    /** IMEへのキー送出イベント（KeyCode） */
     val keyEvent: SharedFlow<Int> = _keyEvent.asSharedFlow()
 
     init {
-        // 設定ストリームを購読し、UI状態にマージする
+        /** 設定ストリームの購読とUI状態への同期 */
         viewModelScope.launch {
             settingsRepository.useSwipeGestureFlow.collect { isEnabled ->
                 _state.update { it.copy(useSwipeGesture = isEnabled) }
@@ -62,6 +59,8 @@ class OcrKeyboardViewModel(
 
     /**
      * ユーザー操作の処理
+     *
+     * 画面から発行されたインテントに応じた状態更新またはイベント送出
      *
      * @param intent ユーザーのアクション
      */
@@ -114,6 +113,17 @@ class OcrKeyboardViewModel(
 
     /**
      * 画像の認識処理実行
+     *
+     * ユースケースを介してOCRを実行し結果を状態へ反映
+     *
+     * @param imageBytes 画像データ
+     * @param rotationDegrees 回転角度
+     * @param useJapanese 日本語認識を使用するか
+     * @param viewWidth プレビュー幅
+     * @param viewHeight プレビュー高さ
+     * @param boxWidthRatio スキャン枠幅比率
+     * @param boxHeightRatio スキャン枠高さ比率
+     * @param boxTopRatio スキャン枠上部比率
      */
     private fun recognizeImage(
         imageBytes: ByteArray,
@@ -165,6 +175,14 @@ class OcrKeyboardViewModel(
         }
     }
 
+    /**
+     * 入力候補の生成
+     *
+     * 区切り文字に基づく文字列分割および結合パターンの作成
+     *
+     * @param text 認識された文字列
+     * @return 候補文字列リスト
+     */
     private fun generateCandidates(text: String): List<String> {
         val delimiters = charArrayOf('-', ' ', '　')
         if (!text.any { it in delimiters }) return emptyList()
@@ -176,6 +194,9 @@ class OcrKeyboardViewModel(
         return listOf(joined) + parts
     }
 
+    /**
+     * エラーメッセージの自動消去予約
+     */
     private fun scheduleErrorDismissal() {
         viewModelScope.launch {
             delay(ERROR_DISMISS_DELAY_MS)
@@ -184,6 +205,7 @@ class OcrKeyboardViewModel(
     }
 
     companion object {
+        /** エラー表示継続時間（ミリ秒） */
         private const val ERROR_DISMISS_DELAY_MS = 5_000L
     }
 }

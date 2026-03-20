@@ -8,7 +8,6 @@ import android.provider.Settings
 import androidx.camera.core.ImageCapture
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -43,7 +42,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -70,8 +68,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.haru.ocrkeyboard.data.local.SettingsStore
 import com.haru.ocrkeyboard.presentation.keyboard.components.CameraPreview
 import com.haru.ocrkeyboard.presentation.keyboard.components.takePicture
 import kotlin.math.abs
@@ -79,9 +75,9 @@ import kotlin.math.atan2
 import kotlinx.coroutines.delay
 
 /**
- * OCRキーボードのメイン画面（Stateful Composable）
+ * OCRキーボードのメイン画面
  *
- * 権限管理およびカメラ制御のライフサイクル統合
+ * 権限管理およびカメラ制御のライフサイクル統合を担当
  *
  * @param state UI状態
  * @param onIntent インテント発行用コールバック
@@ -93,9 +89,9 @@ fun OcrKeyboardScreen(
     onIntent: (OcrKeyboardIntent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    /** コンテキスト保持 */
     val context = LocalContext.current
-    /** カメラ権限付与状態 */
+    
+    /** カメラ権限の付与状態 */
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -136,19 +132,12 @@ fun OcrKeyboardScreen(
         return
     }
 
-    /** 画像キャプチャ用インスタンス */
+    /** 画像キャプチャ用インスタンスの保持 */
     val imageCapture = remember { ImageCapture.Builder().build() }
-    /** ユーザー設定ストア */
-    val settingsStore = remember { SettingsStore(context) }
-    /** 設定変更をリアルタイムに反映するための監視 */
-    val useSwipeGesture by settingsStore.useSwipeGestureFlow.collectAsStateWithLifecycle()
-    val useJapanese by settingsStore.useJapaneseRecognitionFlow.collectAsStateWithLifecycle()
     
     OcrKeyboardContent(
         state = state,
         onIntent = onIntent,
-        useSwipeGesture = useSwipeGesture,
-        useJapanese = useJapanese,
         cameraPreview = { previewModifier ->
             CameraPreview(
                 imageCapture = imageCapture,
@@ -168,7 +157,7 @@ fun OcrKeyboardScreen(
                         )
                     )
                 },
-                onError = { /* エラーハンドリング */ }
+                onError = { /* エラー通知ロジック等 */ }
             )
         },
         onOpenApp = {
@@ -184,14 +173,12 @@ fun OcrKeyboardScreen(
 }
 
 /**
- * OCRキーボードのUIレイアウト（Stateless Composable）
+ * キーボードのUIレイアウト
  *
- * 画面構成要素の配置およびジェスチャー検知
+ * 画面構成要素の配置およびジェスチャー検知を管理
  *
  * @param state UI状態
  * @param onIntent インテント発行用コールバック
- * @param useSwipeGesture ジェスチャーにスワイプを使用するか
- * @param useJapanese 日本語認識を使用するか
  * @param cameraPreview カメラプレビュー表示用Composable
  * @param onCapture シャッター実行時のコールバック
  * @param onOpenApp 設定アプリを開くコールバック
@@ -201,16 +188,14 @@ fun OcrKeyboardScreen(
 private fun OcrKeyboardContent(
     state: OcrKeyboardState,
     onIntent: (OcrKeyboardIntent) -> Unit,
-    useSwipeGesture: Boolean,
-    useJapanese: Boolean,
     cameraPreview: @Composable (Modifier) -> Unit,
     onCapture: (Int, Int, Boolean, Float, Float, Float) -> Unit,
     onOpenApp: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    /** プレビュー表示幅 */
+    /** プレビュー表示幅の計測値 */
     var previewWidth by remember { mutableIntStateOf(0) }
-    /** プレビュー表示高さ */
+    /** プレビュー表示高さの計測値 */
     var previewHeight by remember { mutableIntStateOf(0) }
     /** スキャン枠の横幅比率 */
     var boxWidthRatio by remember { mutableFloatStateOf(0.8f) }
@@ -243,9 +228,9 @@ private fun OcrKeyboardContent(
                 previewWidth = it.size.width
                 previewHeight = it.size.height
             }
-            .pointerInput(useSwipeGesture) {
+            .pointerInput(state.useSwipeGesture) {
                 handleGesture(
-                    useSwipeGesture = useSwipeGesture,
+                    useSwipeGesture = state.useSwipeGesture,
                     onUpdateBox = { dw, dh ->
                         boxWidthRatio = (boxWidthRatio + dw).coerceIn(0.2f, 1.0f)
                         boxHeightRatio = (boxHeightRatio + dh).coerceIn(0.05f, 0.8f)
@@ -297,7 +282,7 @@ private fun OcrKeyboardContent(
                 isDeletePressed = isDeletePressed,
                 onDeletePressChange = { isDeletePressed = it },
                 onCaptureClick = {
-                    onCapture(previewWidth, previewHeight, useJapanese, boxWidthRatio, boxHeightRatio, boxTopRatio)
+                    onCapture(previewWidth, previewHeight, state.useJapanese, boxWidthRatio, boxHeightRatio, boxTopRatio)
                 },
                 onNextClick = { onIntent(OcrKeyboardIntent.NextKeyPressed) },
                 onEnterClick = { onIntent(OcrKeyboardIntent.EnterKeyPressed) },
@@ -346,7 +331,7 @@ private fun SuggestionRow(
 }
 
 /**
- * スキャン範囲を示す透過ターゲット枠の描画
+ * スキャン範囲を示す透過ターゲット枠
  *
  * @param boxWidthRatio 枠幅比率
  * @param boxHeightRatio 枠高さ比率
@@ -390,11 +375,12 @@ private fun ScanningOverlay(
 /**
  * 現在の状態またはエラー内容の表示
  *
- * @param errorMessage エラーメッセージ（null時はデフォルト表示）
+ * @param errorMessage エラーメッセージ
  * @param modifier 修飾子
  */
 @Composable
 private fun StatusText(errorMessage: String?, modifier: Modifier = Modifier) {
+    /** 枠内のガイダンスまたはエラー内容を表示 */
     Text(
         text = errorMessage ?: "枠内にコードを合わせてください",
         color = if (errorMessage != null) MaterialTheme.colorScheme.error else Color.White,
@@ -404,7 +390,7 @@ private fun StatusText(errorMessage: String?, modifier: Modifier = Modifier) {
 }
 
 /**
- * 処理中の円形インジケータ表示
+ * 処理中の円形インジケータ
  */
 @Composable
 private fun LoadingOverlay() {
@@ -419,9 +405,9 @@ private fun LoadingOverlay() {
 }
 
 /**
- * 下部の主要アクションボタン群
+ * 下部のアクションボタン群
  *
- * @param isDeletePressed 削除ボタン押下中フラグ
+ * @param isDeletePressed 削除ボタン押下フラグ
  * @param onDeletePressChange 押下状態変更コールバック
  * @param onCaptureClick スキャン実行ボタン押下時の処理
  * @param onNextClick 次へボタン押下時の処理
@@ -473,26 +459,20 @@ private fun KeyboardControls(
             modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            /** 削除ボタン：指が離れるまでオートリピートを継続しポインター移動を専有 */
             Box(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
                     .background(if (isDeletePressed) Color.Gray.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.8f))
                     .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val down = awaitFirstDown(requireUnconsumed = false)
-                                onDeletePressChange(true)
-                                val pointerId = down.id
-                                do {
-                                    val event = awaitPointerEvent()
-                                    val change = event.changes.find { it.id == pointerId }
-                                    /** 他のジェスチャーとの競合を防ぐため変更を専有 */
-                                    change?.consume()
-                                } while (change?.pressed == true)
-                                onDeletePressChange(false)
-                            }
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            onDeletePressChange(true)
+                            do {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { it.consume() }
+                            } while (event.changes.any { it.pressed })
+                            onDeletePressChange(false)
                         }
                     },
                 contentAlignment = Alignment.Center
@@ -513,9 +493,9 @@ private fun KeyboardControls(
 }
 
 /**
- * カメラ権限が付与されていない場合のメッセージ表示
+ * カメラ権限不足時のメッセージ表示
  *
- * @param onOpenSettings OS設定画面起動コールバック
+ * @param onOpenSettings 設定画面起動コールバック
  * @param modifier 修飾子
  */
 @Composable
@@ -536,10 +516,12 @@ private fun PermissionRequiredContent(onOpenSettings: () -> Unit, modifier: Modi
 }
 
 /**
- * ユーザー入力による枠サイズ変更のジェスチャー解析
+ * 枠サイズ変更のジェスチャー解析
  *
- * @param useSwipeGesture 1本指スワイプを使用するか
- * @param onUpdateBox 更新量（比率）の通知コールバック
+ * 1本指スワイプまたは2本指ピンチを検知し枠サイズを更新
+ *
+ * @param useSwipeGesture スワイプ使用フラグ
+ * @param onUpdateBox 更新通知コールバック
  */
 private suspend fun PointerInputScope.handleGesture(
     useSwipeGesture: Boolean,
@@ -549,9 +531,11 @@ private suspend fun PointerInputScope.handleGesture(
         awaitFirstDown()
         do {
             val event = awaitPointerEvent()
-            /** ボタン類で消費されていないポインターのみを対象に解析 */
+            /** ボタン等で消費されていないポインターのみを抽出 */
             val pointers = event.changes.filter { it.pressed && !it.isConsumed }
+            
             if (useSwipeGesture && pointers.size == 1) {
+                /** 1本指スワイプによるサイズ変更（高感度設定） */
                 val change = pointers.first()
                 val sensitivity = 0.001f
                 val dx = change.position.x - change.previousPosition.x
@@ -560,6 +544,7 @@ private suspend fun PointerInputScope.handleGesture(
                 else onUpdateBox(0f, dy * sensitivity)
                 change.consume()
             } else if (!useSwipeGesture && pointers.size == 2) {
+                /** 2本指ピンチによるサイズ変更 */
                 val p1 = pointers[0].position
                 val p2 = pointers[1].position
                 val pp1 = pointers[0].previousPosition
@@ -572,10 +557,12 @@ private suspend fun PointerInputScope.handleGesture(
                 val normalizedAngle = if (absAngle > 90) 180 - absAngle else absAngle
 
                 if (normalizedAngle <= 45) {
+                    /** 水平方向のピンチ */
                     val currentDistX = abs(p1.x - p2.x)
                     val prevDistX = abs(pp1.x - pp2.x)
                     if (prevDistX > 0) onUpdateBox((currentDistX / prevDistX - 1f) * 0.1f, 0f)
                 } else {
+                    /** 垂直方向のピンチ */
                     val currentDistY = abs(p1.y - p2.y)
                     val prevDistY = abs(pp1.y - pp2.y)
                     if (prevDistY > 0) onUpdateBox(0f, (currentDistY / prevDistY - 1f) * 0.1f)
@@ -587,7 +574,7 @@ private suspend fun PointerInputScope.handleGesture(
 }
 
 /**
- * 通常運用状態のプレビュー
+ * デフォルト状態のプレビュー
  */
 @Preview(showBackground = true, name = "Default State")
 @Composable
@@ -596,8 +583,6 @@ private fun OcrKeyboardScreenNormalPreview() {
         OcrKeyboardContent(
             state = OcrKeyboardState(),
             onIntent = {},
-            useSwipeGesture = true,
-            useJapanese = false,
             cameraPreview = { Box(it.background(Color.DarkGray)) },
             onCapture = { _, _, _, _, _, _ -> },
             onOpenApp = {}
@@ -618,8 +603,6 @@ private fun OcrKeyboardScreenSuggestionPreview() {
                 suggestionCandidates = listOf("123456789", "123", "456", "789")
             ),
             onIntent = {},
-            useSwipeGesture = true,
-            useJapanese = false,
             cameraPreview = { Box(it.background(Color.DarkGray)) },
             onCapture = { _, _, _, _, _, _ -> },
             onOpenApp = {}
@@ -637,8 +620,6 @@ private fun OcrKeyboardScreenLoadingPreview() {
         OcrKeyboardContent(
             state = OcrKeyboardState(isRecognizing = true),
             onIntent = {},
-            useSwipeGesture = true,
-            useJapanese = false,
             cameraPreview = { Box(it.background(Color.DarkGray)) },
             onCapture = { _, _, _, _, _, _ -> },
             onOpenApp = {}
@@ -656,8 +637,6 @@ private fun OcrKeyboardScreenErrorPreview() {
         OcrKeyboardContent(
             state = OcrKeyboardState(errorMessage = "テキストが検出されませんでした"),
             onIntent = {},
-            useSwipeGesture = true,
-            useJapanese = false,
             cameraPreview = { Box(it.background(Color.DarkGray)) },
             onCapture = { _, _, _, _, _, _ -> },
             onOpenApp = {}

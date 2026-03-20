@@ -4,36 +4,40 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.haru.ocrkeyboard.ui.theme.OCRKeyboardTheme
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
-import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.haru.ocrkeyboard.data.local.SettingsRepository
+import com.haru.ocrkeyboard.ui.theme.OCRKeyboardTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -67,11 +71,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun TestInputScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val settingsStore = remember { com.haru.ocrkeyboard.data.local.SettingsStore(context) }
+    val settingsRepository = remember { SettingsRepository(context) }
+    val scope = rememberCoroutineScope()
     
-    var text by remember { androidx.compose.runtime.mutableStateOf("") }
-    val useSwipeGesture by settingsStore.useSwipeGestureFlow.collectAsStateWithLifecycle()
-    val useJapanese by settingsStore.useJapaneseRecognitionFlow.collectAsStateWithLifecycle()
+    var text by remember { mutableStateOf("") }
+    val useSwipeGesture by settingsRepository.useSwipeGestureFlow.collectAsStateWithLifecycle(initialValue = false)
+    val useJapanese by settingsRepository.useJapaneseRecognitionFlow.collectAsStateWithLifecycle(initialValue = false)
 
     Column(
         modifier = modifier
@@ -96,16 +101,16 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
                 .selectable(
                     selected = !useSwipeGesture,
                     onClick = { 
-                        settingsStore.useSwipeGesture = false
+                        scope.launch { settingsRepository.setUseSwipeGesture(false) }
                     },
                     role = Role.RadioButton
                 )
                 .padding(vertical = 8.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically
         ) {
             RadioButton(
                 selected = !useSwipeGesture,
-                onClick = null // RowのModifier.selectableに委譲
+                onClick = null
             )
             Text(text = "ピンチ操作 (2本指で拡大縮小)", modifier = Modifier.padding(start = 8.dp))
         }
@@ -116,16 +121,16 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
                 .selectable(
                     selected = useSwipeGesture,
                     onClick = { 
-                        settingsStore.useSwipeGesture = true
+                        scope.launch { settingsRepository.setUseSwipeGesture(true) }
                     },
                     role = Role.RadioButton
                 )
                 .padding(vertical = 8.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically
         ) {
             RadioButton(
                 selected = useSwipeGesture,
-                onClick = null // RowのModifier.selectableに委譲
+                onClick = null
             )
             Text(text = "スワイプ操作 (1本指で上下左右)", modifier = Modifier.padding(start = 8.dp))
         }
@@ -136,7 +141,7 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -153,7 +158,7 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
             Switch(
                 checked = useJapanese,
                 onCheckedChange = { 
-                    settingsStore.useJapaneseRecognition = it
+                    scope.launch { settingsRepository.setUseJapaneseRecognition(it) }
                 }
             )
         }

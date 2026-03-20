@@ -5,6 +5,8 @@ import com.haru.ocrkeyboard.domain.repository.OcrRepository
 /**
  * テキスト認識実行ユースケース
  *
+ * ドメイン層におけるOCR処理の抽象化を担当
+ *
  * @property ocrRepository OCRリポジトリ
  */
 class RecognizeTextUseCase(
@@ -12,6 +14,8 @@ class RecognizeTextUseCase(
 ) {
     /**
      * テキスト認識の実行
+     *
+     * 与えられた画像データからスキャン枠に基づいたテキスト抽出を行う
      *
      * @param imageBytes 画像データ
      * @param rotationDegrees 回転角度
@@ -21,7 +25,7 @@ class RecognizeTextUseCase(
      * @param boxWidthRatio スキャン枠幅比率
      * @param boxHeightRatio スキャン枠高さ比率
      * @param boxTopRatio スキャン枠上部比率
-     * @return 認識結果のResult
+     * @return 認識結果のResult型文字列
      */
     suspend operator fun invoke(
         imageBytes: ByteArray,
