@@ -13,9 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.nio.ByteBuffer
 
 /**
@@ -31,7 +31,7 @@ fun CameraPreview(
     onCameraReady: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
+    LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     AndroidView(
@@ -47,7 +47,7 @@ fun CameraPreview(
             cameraProviderFuture.addListener({
                 val cameraProvider = cameraProviderFuture.get()
                 val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
+                    it.surfaceProvider = previewView.surfaceProvider
                 }
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 

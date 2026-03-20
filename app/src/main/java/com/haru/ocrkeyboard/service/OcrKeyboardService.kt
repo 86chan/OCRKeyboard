@@ -71,10 +71,8 @@ class OcrKeyboardService : LifecycleInputMethodService() {
             val layoutParams = win.attributes
             layoutParams.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
             win.attributes = layoutParams
-            
-            win.decorView?.let { decorView ->
-                setupViewTreeOwners(decorView)
-            }
+
+            setupViewTreeOwners(win.decorView)
         }
         setupViewTreeOwners(composeView)
         
