@@ -1,12 +1,30 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.devtools.ksp)
 }
 
+val keystorePropertiesFile = rootProject.file("local.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.haru.ocrkeyboard"
     compileSdk = 36
+
+    signingConfigs {
+        create("release") {
+            storeFile = keystoreProperties["signing.storeFile"]?.let { file(it) }
+            storePassword = keystoreProperties["signing.storePassword"] as String?
+            keyAlias = keystoreProperties["signing.keyAlias"] as String?
+            keyPassword = keystoreProperties["signing.keyPassword"] as String?
+        }
+    }
 
     defaultConfig {
         applicationId = "com.haru.ocrkeyboard"
@@ -20,7 +38,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
