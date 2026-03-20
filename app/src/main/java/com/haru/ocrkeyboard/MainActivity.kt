@@ -25,13 +25,15 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Switch
 import androidx.compose.ui.semantics.Role
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -67,8 +69,9 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val settingsStore = remember { com.haru.ocrkeyboard.data.local.SettingsStore(context) }
     
-    var text by remember { mutableStateOf("") }
-    var useSwipeGesture by remember { mutableStateOf(settingsStore.useSwipeGesture) }
+    var text by remember { androidx.compose.runtime.mutableStateOf("") }
+    val useSwipeGesture by settingsStore.useSwipeGestureFlow.collectAsStateWithLifecycle()
+    val useJapanese by settingsStore.useJapaneseRecognitionFlow.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -93,7 +96,6 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
                 .selectable(
                     selected = !useSwipeGesture,
                     onClick = { 
-                        useSwipeGesture = false
                         settingsStore.useSwipeGesture = false
                     },
                     role = Role.RadioButton
@@ -114,7 +116,6 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
                 .selectable(
                     selected = useSwipeGesture,
                     onClick = { 
-                        useSwipeGesture = true
                         settingsStore.useSwipeGesture = true
                     },
                     role = Role.RadioButton
@@ -127,6 +128,34 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
                 onClick = null // RowのModifier.selectableに委譲
             )
             Text(text = "スワイプ操作 (1本指で上下左右)", modifier = Modifier.padding(start = 8.dp))
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "日本語認識を有効にする",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "オフの場合は英数字のみを認識します。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = useJapanese,
+                onCheckedChange = { 
+                    settingsStore.useJapaneseRecognition = it
+                }
+            )
         }
         
         Spacer(modifier = Modifier.height(32.dp))

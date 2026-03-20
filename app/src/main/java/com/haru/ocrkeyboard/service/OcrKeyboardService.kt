@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.lifecycleScope
+import com.haru.ocrkeyboard.data.local.SettingsRepository
 import com.haru.ocrkeyboard.data.repository.OcrRepositoryImpl
 import com.haru.ocrkeyboard.domain.usecase.RecognizeTextUseCase
 import com.haru.ocrkeyboard.presentation.keyboard.OcrKeyboardIntent
@@ -26,7 +27,8 @@ class OcrKeyboardService : LifecycleInputMethodService() {
         // 依存関係の手動注入
         val repository = OcrRepositoryImpl()
         val useCase = RecognizeTextUseCase(repository)
-        viewModel = OcrKeyboardViewModel(useCase)
+        val settingsRepository = SettingsRepository(applicationContext)
+        viewModel = OcrKeyboardViewModel(useCase, settingsRepository)
 
         // ViewModelからのテキスト送信イベントの購読と適用
         lifecycleScope.launch {

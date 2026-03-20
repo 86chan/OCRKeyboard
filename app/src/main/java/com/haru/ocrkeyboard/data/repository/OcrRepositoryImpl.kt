@@ -6,6 +6,7 @@ import android.graphics.Matrix
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.haru.ocrkeyboard.domain.repository.OcrRepository
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -18,9 +19,14 @@ import kotlin.coroutines.resume
 class OcrRepositoryImpl : OcrRepository {
 
     /**
-     * ML Kitの日本語テキスト認識クライアント
+     * ML Kitのテキスト認識クライアント（ラテン文字用）
      */
-    private val recognizer = TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
+    private val latinRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+    /**
+     * ML Kitのテキスト認識クライアント（日本語用）
+     */
+    private val japaneseRecognizer = TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
 
     /**
      * 画像バイト配列からのテキスト抽出実装
@@ -29,11 +35,18 @@ class OcrRepositoryImpl : OcrRepository {
      *
      * @param imageBytes 画像データ
      * @param rotationDegrees 回転角度
+     * @param useJapanese 日本語認識を使用するか
+     * @param viewWidth プレビューの幅
+     * @param viewHeight プレビューの高さ
+     * @param boxWidthRatio スキャン枠の幅比率
+     * @param boxHeightRatio スキャン枠の高さ比率
+     * @param boxTopRatio スキャン枠の上部オフセット比率
      * @return 抽出結果
      */
     override suspend fun extractText(
         imageBytes: ByteArray, 
         rotationDegrees: Int,
+        useJapanese: Boolean,
         viewWidth: Int,
         viewHeight: Int,
         boxWidthRatio: Float,
@@ -62,8 +75,6 @@ class OcrRepositoryImpl : OcrRepository {
                 val cropY: Int
 
                 if (viewWidth > 0 && viewHeight > 0) {
-                    // PreviewUses FILL_CENTER, meaning it scales the image to fill the view, 
-                    // cropping the overflow on either X or Y axis depending on the aspect ratio.
                     val scale = maxOf(
                         viewWidth.toFloat() / rotatedBitmap.width,
                         viewHeight.toFloat() / rotatedBitmap.height
@@ -72,21 +83,17 @@ class OcrRepositoryImpl : OcrRepository {
                     val scaledBitmapWidth = rotatedBitmap.width * scale
                     val scaledBitmapHeight = rotatedBitmap.height * scale
                     
-                    // The view is centered on the scaled bitmap
                     val previewLeftOnScaled = (scaledBitmapWidth - viewWidth) / 2
                     val previewTopOnScaled = (scaledBitmapHeight - viewHeight) / 2
                     
-                    // The target box in the UI view
                     val boxWidthOnPreview = viewWidth * boxWidthRatio
                     val boxHeightOnPreview = viewHeight * boxHeightRatio
                     val boxLeftOnPreview = (viewWidth - boxWidthOnPreview) / 2
-                    val boxTopOnPreview = viewHeight * boxTopRatio // 枠の位置
+                    val boxTopOnPreview = viewHeight * boxTopRatio
 
-                    // Map box coordinates from Preview back to the Scaled Bitmap
                     val boxLeftOnScaled = previewLeftOnScaled + boxLeftOnPreview
                     val boxTopOnScaled = previewTopOnScaled + boxTopOnPreview
                     
-                    // Map from Scaled Bitmap back to Original Bitmap
                     cropX = (boxLeftOnScaled / scale).toInt().coerceAtLeast(0)
                     cropY = (boxTopOnScaled / scale).toInt().coerceAtLeast(0)
                     val rawCropWidth = (boxWidthOnPreview / scale).toInt()
@@ -94,7 +101,6 @@ class OcrRepositoryImpl : OcrRepository {
                     cropWidth = minOf(rawCropWidth, rotatedBitmap.width - cropX)
                     cropHeight = minOf(rawCropHeight, rotatedBitmap.height - cropY)
                 } else {
-                    // Fallback using old generic percentages
                     cropWidth = (rotatedBitmap.width * 0.8f).toInt()
                     cropHeight = (rotatedBitmap.height * 0.4f).toInt()
                     cropX = (rotatedBitmap.width - cropWidth) / 2
@@ -102,14 +108,13 @@ class OcrRepositoryImpl : OcrRepository {
                 }
                 
                 val croppedBitmap = Bitmap.createBitmap(rotatedBitmap, cropX, cropY, cropWidth, cropHeight)
-                
-                // InputImageには回転済み・クロップ済みのBitmapを渡すためrotationは0
                 val image = InputImage.fromBitmap(croppedBitmap, 0)
                 
+                val recognizer = if (useJapanese) japaneseRecognizer else latinRecognizer
+
                 recognizer.process(image)
                     .addOnSuccessListener { visionText ->
                         if (continuation.isActive) {
-                            // 改行をスペースに変換して1行のコードとして扱いやすくする
                             val text = visionText.text.replace("\n", " ").trim()
                             continuation.resume(Result.success(text))
                         }

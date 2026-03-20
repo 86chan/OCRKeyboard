@@ -72,6 +72,7 @@ dependencies {
     implementation(libs.moshi.kotlin)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.material)
+    implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.text.recognition.japanese)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -14,6 +14,7 @@ sealed class OcrKeyboardIntent {
      *
      * @property imageBytes キャプチャされた画像データ
      * @property rotationDegrees 画像の回転角度
+     * @property useJapanese 日本語認識を使用するか
      * @property viewWidth カメラプレビューのUI上の幅
      * @property viewHeight カメラプレビューのUI上の高さ
      * @property boxWidthRatio スキャン枠の幅比率
@@ -23,6 +24,7 @@ sealed class OcrKeyboardIntent {
     data class RecognizeText(
         val imageBytes: ByteArray, 
         val rotationDegrees: Int,
+        val useJapanese: Boolean = false,
         val viewWidth: Int = 0,
         val viewHeight: Int = 0,
         val boxWidthRatio: Float = 0.8f,
@@ -40,6 +42,13 @@ sealed class OcrKeyboardIntent {
      */
     data object TextCommitted : OcrKeyboardIntent()
     
+    /**
+     * 候補が選択されたとき
+     *
+     * @property text 選択されたテキスト
+     */
+    data class SuggestionSelected(val text: String) : OcrKeyboardIntent()
+
     /**
      * 削除キーの押下
      */

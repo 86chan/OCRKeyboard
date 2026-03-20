@@ -8,11 +8,13 @@ import android.provider.Settings
 import androidx.camera.core.ImageCapture
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,21 +23,27 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
 import androidx.compose.material.icons.automirrored.filled.KeyboardTab
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,6 +70,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.haru.ocrkeyboard.data.local.SettingsStore
 import com.haru.ocrkeyboard.presentation.keyboard.components.CameraPreview
 import com.haru.ocrkeyboard.presentation.keyboard.components.takePicture
@@ -131,11 +140,15 @@ fun OcrKeyboardScreen(
     val imageCapture = remember { ImageCapture.Builder().build() }
     /** ユーザー設定ストア */
     val settingsStore = remember { SettingsStore(context) }
+    /** 設定変更をリアルタイムに反映するための監視 */
+    val useSwipeGesture by settingsStore.useSwipeGestureFlow.collectAsStateWithLifecycle()
+    val useJapanese by settingsStore.useJapaneseRecognitionFlow.collectAsStateWithLifecycle()
     
     OcrKeyboardContent(
         state = state,
         onIntent = onIntent,
-        useSwipeGesture = settingsStore.useSwipeGesture,
+        useSwipeGesture = useSwipeGesture,
+        useJapanese = useJapanese,
         cameraPreview = { previewModifier ->
             CameraPreview(
                 imageCapture = imageCapture,
@@ -143,7 +156,7 @@ fun OcrKeyboardScreen(
                 modifier = previewModifier
             )
         },
-        onCapture = { width, height, boxWidth, boxHeight, boxTop ->
+        onCapture = { width, height, isJapaneseEnabled, boxWidth, boxHeight, boxTop ->
             val executor = ContextCompat.getMainExecutor(context)
             takePicture(
                 imageCapture = imageCapture,
@@ -151,12 +164,20 @@ fun OcrKeyboardScreen(
                 onCaptured = { bytes, rotation ->
                     onIntent(
                         OcrKeyboardIntent.RecognizeText(
-                            bytes, rotation, width, height, boxWidth, boxHeight, boxTop
+                            bytes, rotation, isJapaneseEnabled, width, height, boxWidth, boxHeight, boxTop
                         )
                     )
                 },
                 onError = { /* エラーハンドリング */ }
             )
+        },
+        onOpenApp = {
+            val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (intent != null) {
+                context.startActivity(intent)
+            }
         },
         modifier = modifier
     )
@@ -170,8 +191,10 @@ fun OcrKeyboardScreen(
  * @param state UI状態
  * @param onIntent インテント発行用コールバック
  * @param useSwipeGesture ジェスチャーにスワイプを使用するか
+ * @param useJapanese 日本語認識を使用するか
  * @param cameraPreview カメラプレビュー表示用Composable
  * @param onCapture シャッター実行時のコールバック
+ * @param onOpenApp 設定アプリを開くコールバック
  * @param modifier 修飾子
  */
 @Composable
@@ -179,8 +202,10 @@ private fun OcrKeyboardContent(
     state: OcrKeyboardState,
     onIntent: (OcrKeyboardIntent) -> Unit,
     useSwipeGesture: Boolean,
+    useJapanese: Boolean,
     cameraPreview: @Composable (Modifier) -> Unit,
-    onCapture: (Int, Int, Float, Float, Float) -> Unit,
+    onCapture: (Int, Int, Boolean, Float, Float, Float) -> Unit,
+    onOpenApp: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     /** プレビュー表示幅 */
@@ -192,7 +217,7 @@ private fun OcrKeyboardContent(
     /** スキャン枠の高さ比率 */
     var boxHeightRatio by remember { mutableFloatStateOf(0.15f) }
     /** スキャン枠の上部オフセット比率 */
-    val boxTopRatio = 0.08f
+    val boxTopRatio = 0.2f
 
     /** 削除ボタンの継続押下フラグ */
     var isDeletePressed by remember { mutableStateOf(false) }
@@ -236,10 +261,34 @@ private fun OcrKeyboardContent(
             boxTopRatio = boxTopRatio
         )
 
-        StatusText(
-            errorMessage = state.errorMessage,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (state.suggestionCandidates.isNotEmpty()) {
+                SuggestionRow(
+                    candidates = state.suggestionCandidates,
+                    onSelected = { onIntent(OcrKeyboardIntent.SuggestionSelected(it)) },
+                    modifier = Modifier.padding(top = 0.dp)
+                )
+            }
+            StatusText(
+                errorMessage = state.errorMessage,
+                modifier = Modifier.padding(top = 10.dp)
+            )
+        }
+
+        IconButton(
+            onClick = onOpenApp,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.4f))
+        ) {
+            Icon(Icons.Default.Settings, "設定", tint = Color.White)
+        }
 
         if (state.isRecognizing) {
             LoadingOverlay()
@@ -248,12 +297,50 @@ private fun OcrKeyboardContent(
                 isDeletePressed = isDeletePressed,
                 onDeletePressChange = { isDeletePressed = it },
                 onCaptureClick = {
-                    onCapture(previewWidth, previewHeight, boxWidthRatio, boxHeightRatio, boxTopRatio)
+                    onCapture(previewWidth, previewHeight, useJapanese, boxWidthRatio, boxHeightRatio, boxTopRatio)
                 },
                 onNextClick = { onIntent(OcrKeyboardIntent.NextKeyPressed) },
                 onEnterClick = { onIntent(OcrKeyboardIntent.EnterKeyPressed) },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
+        }
+    }
+}
+
+/**
+ * 入力候補の表示行
+ * 
+ * @param candidates 候補リスト
+ * @param onSelected 選択時のコールバック
+ * @param modifier 修飾子
+ */
+@Composable
+private fun SuggestionRow(
+    candidates: List<String>,
+    onSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyRow(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.4f)),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(candidates) { text ->
+            Surface(
+                onClick = { onSelected(text) },
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White.copy(alpha = 0.9f),
+                tonalElevation = 2.dp
+            ) {
+                Text(
+                    text = text,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Black
+                )
+            }
         }
     }
 }
@@ -312,7 +399,7 @@ private fun StatusText(errorMessage: String?, modifier: Modifier = Modifier) {
         text = errorMessage ?: "枠内にコードを合わせてください",
         color = if (errorMessage != null) MaterialTheme.colorScheme.error else Color.White,
         style = MaterialTheme.typography.bodyMedium,
-        modifier = modifier.padding(top = 10.dp)
+        modifier = modifier
     )
 }
 
@@ -361,6 +448,31 @@ private fun KeyboardControls(
             modifier = Modifier.weight(1f),
             contentAlignment = Alignment.Center
         ) {
+            IconButton(
+                onClick = onNextClick,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.8f))
+            ) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardTab, "次へ", tint = Color.Black)
+            }
+        }
+
+        IconButton(
+            onClick = onCaptureClick,
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(Color.White)
+        ) {
+            Icon(Icons.Default.CameraAlt, "スキャン", tint = Color.Black, modifier = Modifier.size(36.dp))
+        }
+
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
             /** 削除ボタン：指が離れるまでオートリピートを継続しポインター移動を専有 */
             Box(
                 modifier = Modifier
@@ -386,31 +498,6 @@ private fun KeyboardControls(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.AutoMirrored.Filled.Backspace, "削除", tint = Color.Black)
-            }
-        }
-
-        IconButton(
-            onClick = onCaptureClick,
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-        ) {
-            Icon(Icons.Default.CameraAlt, "スキャン", tint = Color.Black, modifier = Modifier.size(36.dp))
-        }
-
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            IconButton(
-                onClick = onNextClick,
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.8f))
-            ) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardTab, "次へ", tint = Color.Black)
             }
             IconButton(
                 onClick = onEnterClick,
@@ -510,8 +597,32 @@ private fun OcrKeyboardScreenNormalPreview() {
             state = OcrKeyboardState(),
             onIntent = {},
             useSwipeGesture = true,
+            useJapanese = false,
             cameraPreview = { Box(it.background(Color.DarkGray)) },
-            onCapture = { _, _, _, _, _ -> }
+            onCapture = { _, _, _, _, _, _ -> },
+            onOpenApp = {}
+        )
+    }
+}
+
+/**
+ * 候補表示状態のプレビュー
+ */
+@Preview(showBackground = true, name = "Suggestion State")
+@Composable
+private fun OcrKeyboardScreenSuggestionPreview() {
+    MaterialTheme {
+        OcrKeyboardContent(
+            state = OcrKeyboardState(
+                recognizedText = "123-456-789",
+                suggestionCandidates = listOf("123456789", "123", "456", "789")
+            ),
+            onIntent = {},
+            useSwipeGesture = true,
+            useJapanese = false,
+            cameraPreview = { Box(it.background(Color.DarkGray)) },
+            onCapture = { _, _, _, _, _, _ -> },
+            onOpenApp = {}
         )
     }
 }
@@ -527,8 +638,10 @@ private fun OcrKeyboardScreenLoadingPreview() {
             state = OcrKeyboardState(isRecognizing = true),
             onIntent = {},
             useSwipeGesture = true,
+            useJapanese = false,
             cameraPreview = { Box(it.background(Color.DarkGray)) },
-            onCapture = { _, _, _, _, _ -> }
+            onCapture = { _, _, _, _, _, _ -> },
+            onOpenApp = {}
         )
     }
 }
@@ -544,8 +657,10 @@ private fun OcrKeyboardScreenErrorPreview() {
             state = OcrKeyboardState(errorMessage = "テキストが検出されませんでした"),
             onIntent = {},
             useSwipeGesture = true,
+            useJapanese = false,
             cameraPreview = { Box(it.background(Color.DarkGray)) },
-            onCapture = { _, _, _, _, _ -> }
+            onCapture = { _, _, _, _, _, _ -> },
+            onOpenApp = {}
         )
     }
 }
