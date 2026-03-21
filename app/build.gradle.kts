@@ -1,5 +1,6 @@
 import java.util.Properties
 import java.io.FileInputStream
+import java.io.File
 
 plugins {
     alias(libs.plugins.android.application)
@@ -7,8 +8,16 @@ plugins {
     alias(libs.plugins.google.devtools.ksp)
 }
 
-val keystorePropertiesFile = rootProject.file("local.properties")
-val keystoreProperties = Properties()
+/**
+ * 署名情報を保持するローカルファイルの参照
+ */
+val keystorePropertiesFile: File = rootProject.file("local.properties")
+
+/**
+ * 読み込まれた署名設定のプロパティ
+ */
+val keystoreProperties: Properties = Properties()
+
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
@@ -105,10 +114,7 @@ dependencies {
     androidTestImplementation(libs.androidx.runner)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    "ksp"(libs.androidx.room.compiler)
+    testImplementation(libs.mockito.core)
     "ksp"(libs.moshi.kotlin.codegen)
-}
-
-dependencies {
-    testImplementation("org.mockito:mockito-core:5.11.0")
+    "ksp"(libs.androidx.room.compiler)
 }
