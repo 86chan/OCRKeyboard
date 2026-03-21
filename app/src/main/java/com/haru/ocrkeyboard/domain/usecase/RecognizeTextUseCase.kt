@@ -37,6 +37,9 @@ class RecognizeTextUseCase(
         boxHeightRatio: Float = 0.15f,
         boxTopRatio: Float = 0.05f
     ): Result<String> {
+        if (imageBytes.isEmpty()) {
+            return Result.failure(IllegalArgumentException("Empty image data"))
+        }
         return ocrRepository.extractText(
             imageBytes,
             rotationDegrees,
