@@ -135,7 +135,7 @@ fun OcrKeyboardScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    
+
     /** カメラ権限の付与状態 */
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -179,7 +179,7 @@ fun OcrKeyboardScreen(
 
     /** 画像キャプチャ用インスタンスの保持 */
     val imageCapture = remember { ImageCapture.Builder().build() }
-    
+
     OcrKeyboardContent(
         state = state,
         onIntent = onIntent,
@@ -288,7 +288,7 @@ private fun OcrKeyboardContent(
         ScanningOverlay(
             boxWidthRatioProvider = { boxWidthRatio },
             boxHeightRatioProvider = { boxHeightRatio },
-            boxTopRatioProvider = { boxTopRatio }
+            boxTopRatio = boxTopRatio
         )
 
         Column(
@@ -328,7 +328,7 @@ private fun OcrKeyboardContent(
 
 /**
  * 入力候補の表示行
- * 
+ *
  * @param candidates 候補リスト
  * @param onSelected 選択時のコールバック
  * @param modifier 修飾子
@@ -369,13 +369,13 @@ private fun SuggestionRow(
  *
  * @param boxWidthRatioProvider 枠幅比率の提供関数（再コンポーズ回避用）
  * @param boxHeightRatioProvider 枠高さ比率の提供関数（再コンポーズ回避用）
- * @param boxTopRatioProvider 枠上部位置比率の提供関数（再コンポーズ回避用）
+ * @param boxTopRatio 枠上部位置比率
  */
 @Composable
 private fun ScanningOverlay(
     boxWidthRatioProvider: () -> Float,
     boxHeightRatioProvider: () -> Float,
-    boxTopRatioProvider: () -> Float
+    boxTopRatio: Float
 ) {
     Canvas(
         modifier = Modifier
@@ -385,7 +385,7 @@ private fun ScanningOverlay(
         val boxWidth = size.width * boxWidthRatioProvider()
         val boxHeight = size.height * boxHeightRatioProvider()
         val left = (size.width - boxWidth) / 2
-        val top = size.height * boxTopRatioProvider()
+        val top = size.height * boxTopRatio
         val cornerRadius = 12.dp.toPx()
 
         drawRect(color = Color.Black.copy(alpha = 0.6f))
@@ -581,7 +581,7 @@ private suspend fun PointerInputScope.handleGesture(
             val event = awaitPointerEvent()
             /** ボタン等で消費されていないポインターのみを抽出 */
             val pointers = event.changes.filter { it.pressed && !it.isConsumed }
-            
+
             if (useSwipeGesture && pointers.size == 1) {
                 /** 1本指スワイプによるサイズ変更（高感度設定） */
                 val change = pointers.first()
@@ -597,7 +597,7 @@ private suspend fun PointerInputScope.handleGesture(
                 val p2 = pointers[1].position
                 val pp1 = pointers[0].previousPosition
                 val pp2 = pointers[1].previousPosition
-                
+
                 val dx = p1.x - p2.x
                 val dy = p1.y - p2.y
                 val angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble()))
