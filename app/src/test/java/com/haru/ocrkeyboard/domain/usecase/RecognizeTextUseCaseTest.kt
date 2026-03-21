@@ -115,6 +115,7 @@ class MockOcrRepository : OcrRepository {
     override suspend fun extractText(
         imageBytes: ByteArray,
         rotationDegrees: Int,
+        useJapanese: Boolean,
         viewWidth: Int,
         viewHeight: Int,
         boxWidthRatio: Float,

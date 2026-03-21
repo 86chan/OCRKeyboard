@@ -108,3 +108,7 @@ dependencies {
     "ksp"(libs.androidx.room.compiler)
     "ksp"(libs.moshi.kotlin.codegen)
 }
+
+dependencies {
+    testImplementation("org.mockito:mockito-core:5.11.0")
+}

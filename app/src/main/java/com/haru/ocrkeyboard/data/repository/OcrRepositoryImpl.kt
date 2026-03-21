@@ -61,27 +61,25 @@ class OcrRepositoryImpl : OcrRepository {
                     return@suspendCancellableCoroutine
                 }
                 
-                // 回転を適用して正しい向きにする
-                val rotatedBitmap = if (rotationDegrees != 0) {
-                    val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
-                    Bitmap.createBitmap(originalBitmap, 0, 0, originalBitmap.width, originalBitmap.height, matrix, true)
-                } else {
-                    originalBitmap
-                }
+                // 不要なBitmap生成を防ぐため、元の画像のままクロップ位置を計算する
+                // Get dimensions as if it were rotated to the correct orientation
+                val isRotated = rotationDegrees == 90 || rotationDegrees == 270
+                val rotatedWidth = if (isRotated) originalBitmap.height else originalBitmap.width
+                val rotatedHeight = if (isRotated) originalBitmap.width else originalBitmap.height
 
-                val cropWidth: Int
-                val cropHeight: Int
-                val cropX: Int
-                val cropY: Int
+                val cropWidthRotated: Int
+                val cropHeightRotated: Int
+                val cropXRotated: Int
+                val cropYRotated: Int
 
                 if (viewWidth > 0 && viewHeight > 0) {
                     val scale = maxOf(
-                        viewWidth.toFloat() / rotatedBitmap.width,
-                        viewHeight.toFloat() / rotatedBitmap.height
+                        viewWidth.toFloat() / rotatedWidth,
+                        viewHeight.toFloat() / rotatedHeight
                     )
                     
-                    val scaledBitmapWidth = rotatedBitmap.width * scale
-                    val scaledBitmapHeight = rotatedBitmap.height * scale
+                    val scaledBitmapWidth = rotatedWidth * scale
+                    val scaledBitmapHeight = rotatedHeight * scale
                     
                     val previewLeftOnScaled = (scaledBitmapWidth - viewWidth) / 2
                     val previewTopOnScaled = (scaledBitmapHeight - viewHeight) / 2
@@ -94,21 +92,50 @@ class OcrRepositoryImpl : OcrRepository {
                     val boxLeftOnScaled = previewLeftOnScaled + boxLeftOnPreview
                     val boxTopOnScaled = previewTopOnScaled + boxTopOnPreview
                     
-                    cropX = (boxLeftOnScaled / scale).toInt().coerceAtLeast(0)
-                    cropY = (boxTopOnScaled / scale).toInt().coerceAtLeast(0)
+                    cropXRotated = (boxLeftOnScaled / scale).toInt().coerceAtLeast(0)
+                    cropYRotated = (boxTopOnScaled / scale).toInt().coerceAtLeast(0)
                     val rawCropWidth = (boxWidthOnPreview / scale).toInt()
                     val rawCropHeight = (boxHeightOnPreview / scale).toInt()
-                    cropWidth = minOf(rawCropWidth, rotatedBitmap.width - cropX)
-                    cropHeight = minOf(rawCropHeight, rotatedBitmap.height - cropY)
+                    cropWidthRotated = minOf(rawCropWidth, rotatedWidth - cropXRotated)
+                    cropHeightRotated = minOf(rawCropHeight, rotatedHeight - cropYRotated)
                 } else {
-                    cropWidth = (rotatedBitmap.width * 0.8f).toInt()
-                    cropHeight = (rotatedBitmap.height * 0.4f).toInt()
-                    cropX = (rotatedBitmap.width - cropWidth) / 2
-                    cropY = (rotatedBitmap.height * 0.3f).toInt()
+                    cropWidthRotated = (rotatedWidth * 0.8f).toInt()
+                    cropHeightRotated = (rotatedHeight * 0.4f).toInt()
+                    cropXRotated = (rotatedWidth - cropWidthRotated) / 2
+                    cropYRotated = (rotatedHeight * 0.3f).toInt()
+                }
+
+                val origX: Int
+                val origY: Int
+                when (rotationDegrees) {
+                    90 -> {
+                        origX = cropYRotated
+                        origY = rotatedWidth - cropXRotated - cropWidthRotated
+                    }
+                    180 -> {
+                        origX = rotatedWidth - cropXRotated - cropWidthRotated
+                        origY = rotatedHeight - cropYRotated - cropHeightRotated
+                    }
+                    270 -> {
+                        origX = rotatedHeight - cropYRotated - cropHeightRotated
+                        origY = cropXRotated
+                    }
+                    else -> {
+                        origX = cropXRotated
+                        origY = cropYRotated
+                    }
                 }
                 
-                val croppedBitmap = Bitmap.createBitmap(rotatedBitmap, cropX, cropY, cropWidth, cropHeight)
-                val image = InputImage.fromBitmap(croppedBitmap, 0)
+                val origW = if (isRotated) cropHeightRotated else cropWidthRotated
+                val origH = if (isRotated) cropWidthRotated else cropHeightRotated
+
+                val finalOrigX = origX.coerceAtLeast(0)
+                val finalOrigY = origY.coerceAtLeast(0)
+                val finalOrigW = origW.coerceAtMost(originalBitmap.width - finalOrigX)
+                val finalOrigH = origH.coerceAtMost(originalBitmap.height - finalOrigY)
+
+                val croppedBitmap = Bitmap.createBitmap(originalBitmap, finalOrigX, finalOrigY, finalOrigW, finalOrigH)
+                val image = InputImage.fromBitmap(croppedBitmap, rotationDegrees)
                 
                 val recognizer = if (useJapanese) japaneseRecognizer else latinRecognizer
 
