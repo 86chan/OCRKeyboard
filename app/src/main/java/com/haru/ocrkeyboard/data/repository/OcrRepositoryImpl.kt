@@ -2,7 +2,9 @@ package com.haru.ocrkeyboard.data.repository
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Matrix
+import android.graphics.BitmapRegionDecoder
+import android.graphics.Rect
+import android.os.Build
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
@@ -55,17 +57,20 @@ class OcrRepositoryImpl : OcrRepository {
     ): Result<String> {
         return suspendCancellableCoroutine { continuation ->
             try {
-                val originalBitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                if (originalBitmap == null) {
-                    continuation.resume(Result.failure(IllegalArgumentException("画像のデコード失敗")))
+                // 画像のサイズ情報のみを取得（全データをメモリに展開しない）
+                val options = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options)
+
+                if (options.outWidth <= 0 || options.outHeight <= 0) {
+                    continuation.resume(Result.failure(IllegalArgumentException("画像サイズの取得失敗")))
                     return@suspendCancellableCoroutine
                 }
                 
-                // 不要なBitmap生成を防ぐため、元の画像のままクロップ位置を計算する
-                // Get dimensions as if it were rotated to the correct orientation
                 val isRotated = rotationDegrees == 90 || rotationDegrees == 270
-                val rotatedWidth = if (isRotated) originalBitmap.height else originalBitmap.width
-                val rotatedHeight = if (isRotated) originalBitmap.width else originalBitmap.height
+                val rotatedWidth = if (isRotated) options.outHeight else options.outWidth
+                val rotatedHeight = if (isRotated) options.outWidth else options.outHeight
 
                 val cropWidthRotated: Int
                 val cropHeightRotated: Int
@@ -131,10 +136,22 @@ class OcrRepositoryImpl : OcrRepository {
 
                 val finalOrigX = origX.coerceAtLeast(0)
                 val finalOrigY = origY.coerceAtLeast(0)
-                val finalOrigW = origW.coerceAtMost(originalBitmap.width - finalOrigX)
-                val finalOrigH = origH.coerceAtMost(originalBitmap.height - finalOrigY)
+                val finalOrigW = origW.coerceAtMost(options.outWidth - finalOrigX)
+                val finalOrigH = origH.coerceAtMost(options.outHeight - finalOrigY)
 
-                val croppedBitmap = Bitmap.createBitmap(originalBitmap, finalOrigX, finalOrigY, finalOrigW, finalOrigH)
+                // 必要な領域のみをデコード（メモリ使用量を大幅に削減）
+                val decoder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size)
+                } else {
+                    @Suppress("DEPRECATION")
+                    BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size, false)
+                }
+
+                val rect = Rect(finalOrigX, finalOrigY, finalOrigX + finalOrigW, finalOrigY + finalOrigH)
+                val decodeOptions = BitmapFactory.Options()
+                val croppedBitmap = decoder.decodeRegion(rect, decodeOptions) ?: throw IllegalArgumentException("画像のデコードに失敗しました")
+                decoder.recycle()
+
                 val image = InputImage.fromBitmap(croppedBitmap, rotationDegrees)
                 
                 val recognizer = if (useJapanese) japaneseRecognizer else latinRecognizer
