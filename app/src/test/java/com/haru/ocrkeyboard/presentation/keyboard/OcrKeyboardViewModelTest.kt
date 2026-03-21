@@ -37,7 +37,10 @@ class OcrKeyboardViewModelTest {
         Dispatchers.setMain(testDispatcher)
         mockRepository = MockOcrRepository()
         val useCase = RecognizeTextUseCase(mockRepository)
-        viewModel = OcrKeyboardViewModel(useCase)
+        val mockSettings = org.mockito.Mockito.mock(com.haru.ocrkeyboard.data.local.SettingsRepository::class.java)
+        org.mockito.Mockito.`when`(mockSettings.useSwipeGestureFlow).thenReturn(kotlinx.coroutines.flow.emptyFlow())
+        org.mockito.Mockito.`when`(mockSettings.useJapaneseRecognitionFlow).thenReturn(kotlinx.coroutines.flow.emptyFlow())
+        viewModel = OcrKeyboardViewModel(useCase, mockSettings)
     }
 
     @After
@@ -90,7 +93,7 @@ class OcrKeyboardViewModelTest {
         
         // When
         viewModel.onIntent(OcrKeyboardIntent.RecognizeText(byteArrayOf(1), 0))
-        advanceUntilIdle()
+        testDispatcher.scheduler.runCurrent()
 
         // Then
         val state = viewModel.state.value
@@ -120,7 +123,7 @@ class OcrKeyboardViewModelTest {
 
         // When
         viewModel.onIntent(OcrKeyboardIntent.RecognizeText(byteArrayOf(1), 0))
-        advanceUntilIdle()
+        testDispatcher.scheduler.runCurrent()
 
         // Then
         val state = viewModel.state.value
@@ -145,7 +148,7 @@ class OcrKeyboardViewModelTest {
         // Given
         mockRepository.mockResult = Result.success("テストテキスト")
         viewModel.onIntent(OcrKeyboardIntent.RecognizeText(byteArrayOf(1), 0))
-        advanceUntilIdle()
+        testDispatcher.scheduler.runCurrent()
         assertEquals("テストテキスト", viewModel.state.value.recognizedText)
 
         // When
@@ -165,6 +168,7 @@ class MockOcrRepository : OcrRepository {
     override suspend fun extractText(
         imageBytes: ByteArray,
         rotationDegrees: Int,
+        useJapanese: Boolean,
         viewWidth: Int,
         viewHeight: Int,
         boxWidthRatio: Float,
