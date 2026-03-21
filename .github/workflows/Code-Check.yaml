@@ -1,0 +1,46 @@
+name: Android Pull Request Check
+
+on:
+  pull_request:
+    branches: [ "main" ] # mainへのPR時のみ実行
+    types: [opened, synchronize, reopened] # PR作成、追記、再開時にトリガー
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    # 1. ユニットテストの実行
+    - name: Run Unit Tests
+      run: ./gradlew testDebugUnitTest
+
+    # 2. ビルドができるか確認（APKは作成するが保存はしない）
+    - name: Check Build
+      run: ./gradlew assembleDebug
+
+    - name: Publish Test Report
+      uses: mikepenz/action-junit-report@v4
+      if: always() # テストが失敗してもレポートは出す
+      with:
+        report_paths: '**/build/test-results/testDebugUnitTest/*.xml'
+
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v4
+      if: failure() # テスト失敗時のみ実行
+      with:
+        name: test-results
+        path: app/build/test-results/testDebugUnitTest/
