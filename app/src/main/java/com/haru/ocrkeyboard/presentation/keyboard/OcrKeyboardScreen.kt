@@ -263,18 +263,6 @@ private fun OcrKeyboardContent(
             )
         }
 
-        IconButton(
-            onClick = onOpenApp,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.4f))
-        ) {
-            Icon(Icons.Default.Settings, "設定", tint = Color.White)
-        }
-
         if (state.isRecognizing) {
             LoadingOverlay()
         } else {
@@ -286,6 +274,7 @@ private fun OcrKeyboardContent(
                 },
                 onNextClick = { onIntent(OcrKeyboardIntent.NextKeyPressed) },
                 onEnterClick = { onIntent(OcrKeyboardIntent.EnterKeyPressed) },
+                onOpenApp = onOpenApp,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
@@ -412,6 +401,7 @@ private fun LoadingOverlay() {
  * @param onCaptureClick スキャン実行ボタン押下時の処理
  * @param onNextClick 次へボタン押下時の処理
  * @param onEnterClick 改行ボタン押下時の処理
+ * @param onOpenApp 設定アプリを開くコールバック
  * @param modifier 修飾子
  */
 @Composable
@@ -421,6 +411,7 @@ private fun KeyboardControls(
     onCaptureClick: () -> Unit,
     onNextClick: () -> Unit,
     onEnterClick: () -> Unit,
+    onOpenApp: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -430,10 +421,21 @@ private fun KeyboardControls(
             .padding(bottom = 16.dp, start = 16.dp, end = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
+        Row (
             modifier = Modifier.weight(1f),
-            contentAlignment = Alignment.Center
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
+            IconButton(
+                onClick = onOpenApp,
+                modifier = Modifier
+                    .padding(8.dp)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.4f))
+            ) {
+                Icon(Icons.Default.Settings, "設定", tint = Color.White)
+            }
+
             IconButton(
                 onClick = onNextClick,
                 modifier = Modifier
@@ -479,6 +481,7 @@ private fun KeyboardControls(
             ) {
                 Icon(Icons.AutoMirrored.Filled.Backspace, "削除", tint = Color.Black)
             }
+
             IconButton(
                 onClick = onEnterClick,
                 modifier = Modifier

@@ -1,6 +1,8 @@
 package com.haru.ocrkeyboard
 
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -12,9 +14,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -39,6 +46,9 @@ import com.haru.ocrkeyboard.data.local.SettingsRepository
 import com.haru.ocrkeyboard.ui.theme.OCRKeyboardTheme
 import kotlinx.coroutines.launch
 
+/**
+ * アプリのメインアクティビティ
+ */
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,7 +74,7 @@ class MainActivity : ComponentActivity() {
 /**
  * テキスト入力テスト用画面
  *
- * シリアルコードなどのOCR入力確認用UI
+ * キーボードの有効化案内、設定変更、入力テスト用UIの提供
  *
  * @param modifier 修飾子
  */
@@ -85,11 +95,35 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Top
     ) {
         Text(
-            text = "この画面でキーボードを「OCR Keyboard」に切り替えて、シリアルコードの入力をテストできます。",
+            text = "1. キーボードの有効化",
+            style = MaterialTheme.typography.titleLarge
+        )
+        Text(
+            text = "設定アプリで「OCR Keyboard」を有効にする必要があります。",
             style = MaterialTheme.typography.bodyMedium
         )
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Button(
+            onClick = {
+                context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Settings, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("システム設定を開く")
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 24.dp))
+
+        Text(
+            text = "2. キーボードの設定",
+            style = MaterialTheme.typography.titleLarge
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
         
         Text(
             text = "枠サイズ変更のジェスチャー操作",
@@ -163,7 +197,18 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
             )
         }
         
-        Spacer(modifier = Modifier.height(32.dp))
+        HorizontalDivider(modifier = Modifier.padding(vertical = 24.dp))
+
+        Text(
+            text = "3. 入力テスト",
+            style = MaterialTheme.typography.titleLarge
+        )
+        Text(
+            text = "この画面でキーボードを切り替えて、シリアルコードの入力をテストできます。",
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
         
         OutlinedTextField(
             value = text,
@@ -179,8 +224,6 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
 
 /**
  * テキスト入力テスト用画面のプレビュー
- *
- * 画面のデフォルト状態の描画確認用
  */
 @Preview(showBackground = true)
 @Composable
