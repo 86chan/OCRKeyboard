@@ -74,6 +74,51 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlinx.coroutines.delay
 
+/** 削除キーの初回入力待機時間（ミリ秒） */
+private const val DELETE_KEY_INITIAL_DELAY_MS = 400L
+
+/** 削除キーのリピート間隔（ミリ秒） */
+private const val DELETE_KEY_REPEAT_DELAY_MS = 50L
+
+/** スキャン枠のデフォルト横幅比率 */
+private const val DEFAULT_BOX_WIDTH_RATIO = 0.8f
+
+/** スキャン枠のデフォルト高さ比率 */
+private const val DEFAULT_BOX_HEIGHT_RATIO = 0.15f
+
+/** スキャン枠のデフォルト上部オフセット比率 */
+private const val DEFAULT_BOX_TOP_RATIO = 0.2f
+
+/** スキャン枠の最小横幅比率 */
+private const val MIN_BOX_WIDTH_RATIO = 0.2f
+
+/** スキャン枠の最大横幅比率 */
+private const val MAX_BOX_WIDTH_RATIO = 1.0f
+
+/** スキャン枠の最小高さ比率 */
+private const val MIN_BOX_HEIGHT_RATIO = 0.05f
+
+/** スキャン枠の最大高さ比率 */
+private const val MAX_BOX_HEIGHT_RATIO = 0.8f
+
+/** キーボードの高さ（dp） */
+private const val KEYBOARD_HEIGHT_DP = 500
+
+/** スワイプジェスチャーの感度 */
+private const val SWIPE_SENSITIVITY = 0.001f
+
+/** ピンチジェスチャーの感度 */
+private const val PINCH_SENSITIVITY = 0.1f
+
+/** 水平ピンチ判定の角度閾値 */
+private const val GESTURE_HORIZONTAL_ANGLE_THRESHOLD = 45.0
+
+/** 直角の角度（90度） */
+private const val ANGLE_RIGHT_ANGLE = 90.0
+
+/** 直線の角度（180度） */
+private const val ANGLE_STRAIGHT_LINE = 180.0
+
 /**
  * OCRキーボードのメイン画面
  *
@@ -198,11 +243,11 @@ private fun OcrKeyboardContent(
     /** プレビュー表示高さの計測値 */
     var previewHeight by remember { mutableIntStateOf(0) }
     /** スキャン枠の横幅比率 */
-    var boxWidthRatio by remember { mutableFloatStateOf(0.8f) }
+    var boxWidthRatio by remember { mutableFloatStateOf(DEFAULT_BOX_WIDTH_RATIO) }
     /** スキャン枠の高さ比率 */
-    var boxHeightRatio by remember { mutableFloatStateOf(0.15f) }
+    var boxHeightRatio by remember { mutableFloatStateOf(DEFAULT_BOX_HEIGHT_RATIO) }
     /** スキャン枠の上部オフセット比率 */
-    val boxTopRatio = 0.2f
+    val boxTopRatio = DEFAULT_BOX_TOP_RATIO
 
     /** 削除ボタンの継続押下フラグ */
     var isDeletePressed by remember { mutableStateOf(false) }
@@ -211,10 +256,10 @@ private fun OcrKeyboardContent(
     LaunchedEffect(isDeletePressed) {
         if (isDeletePressed) {
             onIntent(OcrKeyboardIntent.DeleteKeyPressed)
-            delay(400)
+            delay(DELETE_KEY_INITIAL_DELAY_MS)
             while (isDeletePressed) {
                 onIntent(OcrKeyboardIntent.DeleteKeyPressed)
-                delay(50)
+                delay(DELETE_KEY_REPEAT_DELAY_MS)
             }
         }
     }
@@ -222,7 +267,7 @@ private fun OcrKeyboardContent(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(500.dp)
+            .height(KEYBOARD_HEIGHT_DP.dp)
             .background(Color.Black)
             .onGloballyPositioned {
                 previewWidth = it.size.width
@@ -232,8 +277,8 @@ private fun OcrKeyboardContent(
                 handleGesture(
                     useSwipeGesture = state.useSwipeGesture,
                     onUpdateBox = { dw, dh ->
-                        boxWidthRatio = (boxWidthRatio + dw).coerceIn(0.2f, 1.0f)
-                        boxHeightRatio = (boxHeightRatio + dh).coerceIn(0.05f, 0.8f)
+                        boxWidthRatio = (boxWidthRatio + dw).coerceIn(MIN_BOX_WIDTH_RATIO, MAX_BOX_WIDTH_RATIO)
+                        boxHeightRatio = (boxHeightRatio + dh).coerceIn(MIN_BOX_HEIGHT_RATIO, MAX_BOX_HEIGHT_RATIO)
                     }
                 )
             }
@@ -540,7 +585,7 @@ private suspend fun PointerInputScope.handleGesture(
             if (useSwipeGesture && pointers.size == 1) {
                 /** 1本指スワイプによるサイズ変更（高感度設定） */
                 val change = pointers.first()
-                val sensitivity = 0.001f
+                val sensitivity = SWIPE_SENSITIVITY
                 val dx = change.position.x - change.previousPosition.x
                 val dy = change.position.y - change.previousPosition.y
                 if (abs(dx) > abs(dy)) onUpdateBox(dx * sensitivity, 0f)
@@ -557,18 +602,18 @@ private suspend fun PointerInputScope.handleGesture(
                 val dy = p1.y - p2.y
                 val angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble()))
                 val absAngle = abs(angle)
-                val normalizedAngle = if (absAngle > 90) 180 - absAngle else absAngle
+                val normalizedAngle = if (absAngle > ANGLE_RIGHT_ANGLE) ANGLE_STRAIGHT_LINE - absAngle else absAngle
 
-                if (normalizedAngle <= 45) {
+                if (normalizedAngle <= GESTURE_HORIZONTAL_ANGLE_THRESHOLD) {
                     /** 水平方向のピンチ */
                     val currentDistX = abs(p1.x - p2.x)
                     val prevDistX = abs(pp1.x - pp2.x)
-                    if (prevDistX > 0) onUpdateBox((currentDistX / prevDistX - 1f) * 0.1f, 0f)
+                    if (prevDistX > 0) onUpdateBox((currentDistX / prevDistX - 1f) * PINCH_SENSITIVITY, 0f)
                 } else {
                     /** 垂直方向のピンチ */
                     val currentDistY = abs(p1.y - p2.y)
                     val prevDistY = abs(pp1.y - pp2.y)
-                    if (prevDistY > 0) onUpdateBox(0f, (currentDistY / prevDistY - 1f) * 0.1f)
+                    if (prevDistY > 0) onUpdateBox(0f, (currentDistY / prevDistY - 1f) * PINCH_SENSITIVITY)
                 }
                 event.changes.forEach { it.consume() }
             }
