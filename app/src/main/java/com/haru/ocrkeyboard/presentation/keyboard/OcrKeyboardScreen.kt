@@ -249,21 +249,6 @@ private fun OcrKeyboardContent(
     /** スキャン枠の上部オフセット比率 */
     val boxTopRatio = DEFAULT_BOX_TOP_RATIO
 
-    /** 削除ボタンの継続押下フラグ */
-    var isDeletePressed by remember { mutableStateOf(false) }
-
-    /** 削除ボタンのオートリピートタイマー管理 */
-    LaunchedEffect(isDeletePressed) {
-        if (isDeletePressed) {
-            onIntent(OcrKeyboardIntent.DeleteKeyPressed)
-            delay(DELETE_KEY_INITIAL_DELAY_MS)
-            while (isDeletePressed) {
-                onIntent(OcrKeyboardIntent.DeleteKeyPressed)
-                delay(DELETE_KEY_REPEAT_DELAY_MS)
-            }
-        }
-    }
-
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -312,8 +297,7 @@ private fun OcrKeyboardContent(
             LoadingOverlay()
         } else {
             KeyboardControls(
-                isDeletePressed = isDeletePressed,
-                onDeletePressChange = { isDeletePressed = it },
+                onDeleteClick = { onIntent(OcrKeyboardIntent.DeleteKeyPressed) },
                 onCaptureClick = {
                     onCapture(previewWidth, previewHeight, state.useJapanese, boxWidthRatio, boxHeightRatio, boxTopRatio)
                 },
@@ -441,8 +425,7 @@ private fun LoadingOverlay() {
 /**
  * 下部のアクションボタン群
  *
- * @param isDeletePressed 削除ボタン押下フラグ
- * @param onDeletePressChange 押下状態変更コールバック
+ * @param onDeleteClick 削除ボタン押下時の処理
  * @param onCaptureClick スキャン実行ボタン押下時の処理
  * @param onNextClick 次へボタン押下時の処理
  * @param onEnterClick 改行ボタン押下時の処理
@@ -451,8 +434,7 @@ private fun LoadingOverlay() {
  */
 @Composable
 private fun KeyboardControls(
-    isDeletePressed: Boolean,
-    onDeletePressChange: (Boolean) -> Unit,
+    onDeleteClick: () -> Unit,
     onCaptureClick: () -> Unit,
     onNextClick: () -> Unit,
     onEnterClick: () -> Unit,
@@ -506,26 +488,9 @@ private fun KeyboardControls(
             modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(if (isDeletePressed) Color.Gray.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.8f))
-                    .pointerInput(Unit) {
-                        awaitEachGesture {
-                            awaitFirstDown(requireUnconsumed = false)
-                            onDeletePressChange(true)
-                            do {
-                                val event = awaitPointerEvent()
-                                event.changes.forEach { it.consume() }
-                            } while (event.changes.any { it.pressed })
-                            onDeletePressChange(false)
-                        }
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Backspace, "削除", tint = Color.Black)
-            }
+            DeleteButton(
+                onDelete = onDeleteClick
+            )
 
             IconButton(
                 onClick = onEnterClick,
@@ -537,6 +502,56 @@ private fun KeyboardControls(
                 Icon(Icons.AutoMirrored.Filled.KeyboardReturn, "エンター", tint = Color.Black)
             }
         }
+    }
+}
+
+/**
+ * 削除ボタンコンポーネント
+ *
+ * 押下状態の管理および長押し時のオートリピート機能の提供
+ *
+ * @param onDelete 削除アクション実行時のコールバック
+ * @param modifier 修飾子
+ */
+@Composable
+private fun DeleteButton(
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    /** 削除ボタンの継続押下フラグ */
+    var isDeletePressed by remember { mutableStateOf(false) }
+
+    /** 削除ボタンのオートリピートタイマー管理 */
+    LaunchedEffect(isDeletePressed) {
+        if (isDeletePressed) {
+            onDelete()
+            delay(DELETE_KEY_INITIAL_DELAY_MS)
+            while (isDeletePressed) {
+                onDelete()
+                delay(DELETE_KEY_REPEAT_DELAY_MS)
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .size(56.dp)
+            .clip(CircleShape)
+            .background(if (isDeletePressed) Color.Gray.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.8f))
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    isDeletePressed = true
+                    do {
+                        val event = awaitPointerEvent()
+                        event.changes.forEach { it.consume() }
+                    } while (event.changes.any { it.pressed })
+                    isDeletePressed = false
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(Icons.AutoMirrored.Filled.Backspace, "削除", tint = Color.Black)
     }
 }
 
