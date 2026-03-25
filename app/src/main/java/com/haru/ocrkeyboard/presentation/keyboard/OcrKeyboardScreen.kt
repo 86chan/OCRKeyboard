@@ -93,13 +93,13 @@ private const val DEFAULT_BOX_TOP_RATIO = 0.2f
 private const val MIN_BOX_WIDTH_RATIO = 0.2f
 
 /** スキャン枠の最大横幅比率 */
-private const val MAX_BOX_WIDTH_RATIO = 1.0f
+private const val MAX_BOX_WIDTH_RATIO = 0.99f
 
 /** スキャン枠の最小高さ比率 */
 private const val MIN_BOX_HEIGHT_RATIO = 0.05f
 
 /** スキャン枠の最大高さ比率 */
-private const val MAX_BOX_HEIGHT_RATIO = 0.8f
+private const val MAX_BOX_HEIGHT_RATIO = 0.4f
 
 /** キーボードの高さ（dp） */
 private const val KEYBOARD_HEIGHT_DP = 500
