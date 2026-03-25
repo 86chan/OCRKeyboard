@@ -148,7 +148,10 @@ class OcrRepositoryImpl : OcrRepository {
                 }
 
                 val rect = Rect(finalOrigX, finalOrigY, finalOrigX + finalOrigW, finalOrigY + finalOrigH)
-                val decodeOptions = BitmapFactory.Options()
+                val decodeOptions = BitmapFactory.Options().apply {
+                    // アルファチャンネルはOCRで不要なため、メモリ使用量を半減(ARGB_8888 -> RGB_565)させる
+                    inPreferredConfig = Bitmap.Config.RGB_565
+                }
                 val croppedBitmap = decoder.decodeRegion(rect, decodeOptions) ?: throw IllegalArgumentException("画像のデコードに失敗しました")
                 decoder.recycle()
 
