@@ -9,3 +9,7 @@
 ## 2025-03-23 - [Avoid Hoisting Rapid-Changing State to Top-Level Screens]
 **Learning:** In Compose, hoisting state variables (like `isDeletePressed`) that change frequently during user interaction (e.g., gestures, animations) to the top-level parent component (like `OcrKeyboardContent`) causes the entire screen to recompose on every change. This forces Compose to re-evaluate the entire layout tree, including expensive elements like `AndroidView` (CameraX preview) and custom `Canvas` overlays, resulting in noticeable UI stuttering.
 **Action:** Encapsulate rapid-changing interaction states and their associated logic (like `LaunchedEffect` for auto-repeat) inside the smallest possible leaf components (e.g., a custom `DeleteButton`). By exposing only standard event callbacks (like `onDelete`) to the parent, you constrain recompositions entirely to the component that visually changes.
+
+## 2025-03-23 - [Use RGB_565 for ML Kit Text Recognition]
+**Learning:** When decoding Bitmaps for ML Kit Text Recognition, the default configuration `Bitmap.Config.ARGB_8888` allocates 4 bytes per pixel. However, text recognition models generally operate on grayscale or simple color channels and do not utilize the alpha channel.
+**Action:** Always specify `inPreferredConfig = Bitmap.Config.RGB_565` in `BitmapFactory.Options` when decoding images destined solely for ML Kit Text Recognition. This reduces the memory footprint by 50% (2 bytes per pixel instead of 4), lowering peak memory usage and speeding up garbage collection without affecting OCR accuracy.
