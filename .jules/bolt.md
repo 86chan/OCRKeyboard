@@ -13,3 +13,7 @@
 ## 2025-03-24 - [Halve Bitmap Memory in OCR pipeline using RGB_565]
 **Learning:** By default, Android's `BitmapFactory` decodes images into the `ARGB_8888` configuration, which consumes 4 bytes per pixel. However, ML Kit's Vision and Text Recognition APIs do not require an alpha channel (they rely on luminance/RGB). Decoding camera byte arrays into `Bitmap.Config.RGB_565` consumes exactly 50% less memory (2 bytes per pixel) without negatively impacting text recognition accuracy.
 **Action:** Always configure `BitmapFactory.Options.inPreferredConfig = Bitmap.Config.RGB_565` when decoding images that will be fed exclusively to ML Kit pipelines or any other computer vision API that does not require transparency.
+
+## 2025-04-03 - [Offload Heavy CPU Operations to Background Thread in Coroutines]
+**Learning:** In Android, invoking a `suspendCancellableCoroutine` block directly from the Main thread executing heavy CPU-bound tasks (like `BitmapFactory.decodeByteArray` or `BitmapRegionDecoder.decodeRegion`) will block the UI thread, causing jank and unresponsiveness. Using a `suspend` keyword does not inherently execute the code on a background thread; it merely suspends execution of the coroutine.
+**Action:** When creating a `suspend` function that performs heavy CPU operations within a coroutine, wrap the block with `withContext(Dispatchers.Default)` to ensure the workload is offloaded to a background thread pool, maintaining a smooth and responsive UI.

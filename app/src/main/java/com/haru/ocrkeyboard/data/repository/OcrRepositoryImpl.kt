@@ -10,7 +10,9 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.haru.ocrkeyboard.domain.repository.OcrRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
 /**
@@ -54,8 +56,9 @@ class OcrRepositoryImpl : OcrRepository {
         boxWidthRatio: Float,
         boxHeightRatio: Float,
         boxTopRatio: Float
-    ): Result<String> {
-        return suspendCancellableCoroutine { continuation ->
+    ): Result<String> = withContext(Dispatchers.Default) {
+        // 画像のデコード処理などはCPU負荷が高いため、Dispatchers.DefaultにオフロードしてUIスレッドのブロックを防ぐ
+        suspendCancellableCoroutine { continuation ->
             try {
                 // 画像のサイズ情報のみを取得（全データをメモリに展開しない）
                 val options = BitmapFactory.Options().apply {
