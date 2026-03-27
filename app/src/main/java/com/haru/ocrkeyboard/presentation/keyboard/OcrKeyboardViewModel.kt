@@ -1,5 +1,6 @@
 package com.haru.ocrkeyboard.presentation.keyboard
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.haru.ocrkeyboard.data.local.SettingsRepository
@@ -169,6 +170,7 @@ class OcrKeyboardViewModel(
                 }
             }
             result.onFailure { error ->
+                Log.e("OcrKeyboard", "Recognition failed", error)
                 _state.update { it.copy(isRecognizing = false, errorMessage = error.message ?: "認識中にエラーが発生しました") }
                 scheduleErrorDismissal()
             }
