@@ -1,6 +1,7 @@
 package com.haru.ocrkeyboard
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -153,7 +154,11 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
         
         Button(
             onClick = {
-                context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+                try {
+                    context.startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+                } catch (e: ActivityNotFoundException) {
+                    // 設定画面を開けない場合の例外処理
+                }
             },
             modifier = Modifier.fillMaxWidth()
         ) {

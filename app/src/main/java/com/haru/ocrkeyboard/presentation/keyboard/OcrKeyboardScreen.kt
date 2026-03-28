@@ -1,6 +1,7 @@
 package com.haru.ocrkeyboard.presentation.keyboard
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -166,11 +167,15 @@ fun OcrKeyboardScreen(
     if (!hasCameraPermission) {
         PermissionRequiredContent(
             onOpenSettings = {
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", context.packageName, null)
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                try {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", context.packageName, null)
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                } catch (e: ActivityNotFoundException) {
+                    // 設定画面を開けない場合の例外処理
                 }
-                context.startActivity(intent)
             },
             modifier = modifier
         )
@@ -206,11 +211,15 @@ fun OcrKeyboardScreen(
             )
         },
         onOpenApp = {
-            val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            if (intent != null) {
-                context.startActivity(intent)
+            try {
+                val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (intent != null) {
+                    context.startActivity(intent)
+                }
+            } catch (e: ActivityNotFoundException) {
+                // アプリを開けない場合の例外処理
             }
         },
         modifier = modifier
