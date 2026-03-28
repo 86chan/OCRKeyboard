@@ -58,11 +58,19 @@ class OcrRepositoryImpl : OcrRepository {
         // CPU負荷の高い画像処理をバックグラウンドスレッドにオフロードし、UIスレッドのブロックを防止
         suspendCancellableCoroutine { continuation ->
             try {
-                // メモリ展開を避けるための画像サイズのみの取得
-                val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options)
+                // メモリ展開を避けるため、BitmapRegionDecoderから直接画像サイズを取得し、冗長なBitmapFactoryのヘッダー解析をスキップする
+                val decoder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size)
+                } else {
+                    @Suppress("DEPRECATION")
+                    BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size, false)
+                }
 
-                if (options.outWidth <= 0 || options.outHeight <= 0) {
+                val outWidth = decoder.width
+                val outHeight = decoder.height
+
+                if (outWidth <= 0 || outHeight <= 0) {
+                    decoder.recycle()
                     if (continuation.isActive) {
                         continuation.resume(Result.failure(IllegalArgumentException("画像サイズの取得失敗")))
                     }
@@ -70,12 +78,12 @@ class OcrRepositoryImpl : OcrRepository {
                 }
 
                 val isRotated = rotationDegrees == 90 || rotationDegrees == 270
-                val rotatedWidth = if (isRotated) options.outHeight else options.outWidth
-                val rotatedHeight = if (isRotated) options.outWidth else options.outHeight
+                val rotatedWidth = if (isRotated) outHeight else outWidth
+                val rotatedHeight = if (isRotated) outWidth else outHeight
 
                 val cropRect = calculateCropRect(
-                    outW = options.outWidth,
-                    outH = options.outHeight,
+                    outW = outWidth,
+                    outH = outHeight,
                     rotW = rotatedWidth,
                     rotH = rotatedHeight,
                     rotation = rotationDegrees,
@@ -86,18 +94,17 @@ class OcrRepositoryImpl : OcrRepository {
                     boxTR = boxTopRatio
                 )
 
-                // 必要な領域のみのデコードによるメモリ使用量削減
-                val decoder =
-                    BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size)
-
                 // OCRではアルファチャンネル不要のため、RGB_565を指定しメモリ使用量を半減
                 val decodeOptions = BitmapFactory.Options().apply {
                     inPreferredConfig = Bitmap.Config.RGB_565
                 }
 
                 val croppedBitmap = decoder.decodeRegion(cropRect, decodeOptions)
-                    ?: throw IllegalArgumentException("画像デコード失敗")
                 decoder.recycle()
+
+                if (croppedBitmap == null) {
+                    throw IllegalArgumentException("画像デコード失敗")
+                }
 
                 val image = InputImage.fromBitmap(croppedBitmap, rotationDegrees)
                 val recognizer = if (useJapanese) japaneseRecognizer else latinRecognizer
