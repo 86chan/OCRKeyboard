@@ -17,3 +17,7 @@
 ## 2025-04-03 - [Offload Heavy CPU Operations to Background Thread in Coroutines]
 **Learning:** In Android, invoking a `suspendCancellableCoroutine` block directly from the Main thread executing heavy CPU-bound tasks (like `BitmapFactory.decodeByteArray` or `BitmapRegionDecoder.decodeRegion`) will block the UI thread, causing jank and unresponsiveness. Using a `suspend` keyword does not inherently execute the code on a background thread; it merely suspends execution of the coroutine.
 **Action:** When creating a `suspend` function that performs heavy CPU operations within a coroutine, wrap the block with `withContext(Dispatchers.Default)` to ensure the workload is offloaded to a background thread pool, maintaining a smooth and responsive UI.
+
+## 2025-04-04 - [Avoid Redundant BitmapFactory Size Decoding]
+**Learning:** When cropping an image with `BitmapRegionDecoder`, you don't need to perform an initial pass with `BitmapFactory.decodeByteArray` using `inJustDecodeBounds = true` just to get the image dimensions. `BitmapRegionDecoder.newInstance` natively parses the image headers to build the decoder, and exposes the dimensions directly via its `width` and `height` properties. Removing the redundant `BitmapFactory` pass eliminates unnecessary CPU overhead during the critical OCR pipeline.
+**Action:** When cropping images in Android, instantiate `BitmapRegionDecoder` directly and use its dimensions instead of performing a redundant initial bounds check with `BitmapFactory`.
