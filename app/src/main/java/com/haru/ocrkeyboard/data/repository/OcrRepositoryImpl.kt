@@ -58,46 +58,47 @@ class OcrRepositoryImpl : OcrRepository {
         // CPU負荷の高い画像処理をバックグラウンドスレッドにオフロードし、UIスレッドのブロックを防止
         suspendCancellableCoroutine { continuation ->
             try {
-                // メモリ展開を避けるための画像サイズのみの取得
-                val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options)
-
-                if (options.outWidth <= 0 || options.outHeight <= 0) {
-                    if (continuation.isActive) {
-                        continuation.resume(Result.failure(IllegalArgumentException("画像サイズの取得失敗")))
-                    }
-                    return@suspendCancellableCoroutine
-                }
-
-                val isRotated = rotationDegrees == 90 || rotationDegrees == 270
-                val rotatedWidth = if (isRotated) options.outHeight else options.outWidth
-                val rotatedHeight = if (isRotated) options.outWidth else options.outHeight
-
-                val cropRect = calculateCropRect(
-                    outW = options.outWidth,
-                    outH = options.outHeight,
-                    rotW = rotatedWidth,
-                    rotH = rotatedHeight,
-                    rotation = rotationDegrees,
-                    viewW = viewWidth,
-                    viewH = viewHeight,
-                    boxWR = boxWidthRatio,
-                    boxHR = boxHeightRatio,
-                    boxTR = boxTopRatio
-                )
-
                 // 必要な領域のみのデコードによるメモリ使用量削減
-                val decoder =
-                    BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size)
+                val decoder = BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size)
 
-                // OCRではアルファチャンネル不要のため、RGB_565を指定しメモリ使用量を半減
-                val decodeOptions = BitmapFactory.Options().apply {
-                    inPreferredConfig = Bitmap.Config.RGB_565
+                val croppedBitmap = try {
+                    val width = decoder.width
+                    val height = decoder.height
+
+                    if (width <= 0 || height <= 0) {
+                        if (continuation.isActive) {
+                            continuation.resume(Result.failure(IllegalArgumentException("画像サイズの取得失敗")))
+                        }
+                        return@suspendCancellableCoroutine
+                    }
+
+                    val isRotated = rotationDegrees == 90 || rotationDegrees == 270
+                    val rotatedWidth = if (isRotated) height else width
+                    val rotatedHeight = if (isRotated) width else height
+
+                    val cropRect = calculateCropRect(
+                        outW = width,
+                        outH = height,
+                        rotW = rotatedWidth,
+                        rotH = rotatedHeight,
+                        rotation = rotationDegrees,
+                        viewW = viewWidth,
+                        viewH = viewHeight,
+                        boxWR = boxWidthRatio,
+                        boxHR = boxHeightRatio,
+                        boxTR = boxTopRatio
+                    )
+
+                    // OCRではアルファチャンネル不要のため、RGB_565を指定しメモリ使用量を半減
+                    val decodeOptions = BitmapFactory.Options().apply {
+                        inPreferredConfig = Bitmap.Config.RGB_565
+                    }
+
+                    decoder.decodeRegion(cropRect, decodeOptions)
+                        ?: throw IllegalArgumentException("画像デコード失敗")
+                } finally {
+                    decoder.recycle()
                 }
-
-                val croppedBitmap = decoder.decodeRegion(cropRect, decodeOptions)
-                    ?: throw IllegalArgumentException("画像デコード失敗")
-                decoder.recycle()
 
                 val image = InputImage.fromBitmap(croppedBitmap, rotationDegrees)
                 val recognizer = if (useJapanese) japaneseRecognizer else latinRecognizer
