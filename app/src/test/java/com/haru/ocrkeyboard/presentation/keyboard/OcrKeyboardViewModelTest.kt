@@ -128,7 +128,7 @@ class OcrKeyboardViewModelTest {
         // Then
         val state = viewModel.state.value
         assertFalse(state.isRecognizing)
-        assertEquals("OCRエラー", state.errorMessage)
+        assertEquals("認識中にエラーが発生しました", state.errorMessage)
     }
 
     /**
