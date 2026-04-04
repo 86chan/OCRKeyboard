@@ -170,8 +170,8 @@ class OcrKeyboardViewModel(
                 }
             }
             result.onFailure { error ->
-                Log.e("OcrKeyboard", "Recognition failed", error)
-                _state.update { it.copy(isRecognizing = false, errorMessage = error.message ?: "認識中にエラーが発生しました") }
+                Log.e("OcrKeyboard", "Recognition failed: ${error::class.simpleName}")
+                _state.update { it.copy(isRecognizing = false, errorMessage = "認識中にエラーが発生しました") }
                 scheduleErrorDismissal()
             }
         }
