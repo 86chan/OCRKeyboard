@@ -74,6 +74,8 @@ import com.haru.ocrkeyboard.presentation.keyboard.components.takePicture
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlinx.coroutines.delay
+import androidx.compose.ui.util.fastAny
+import androidx.compose.ui.util.fastForEach
 
 /** 削除キーの初回入力待機時間（ミリ秒） */
 private const val DELETE_KEY_INITIAL_DELAY_MS = 400L
@@ -553,8 +555,8 @@ private fun DeleteButton(
                     isDeletePressed = true
                     do {
                         val event = awaitPointerEvent()
-                        event.changes.forEach { it.consume() }
-                    } while (event.changes.any { it.pressed })
+                        event.changes.fastForEach { it.consume() }
+                    } while (event.changes.fastAny { it.pressed })
                     isDeletePressed = false
                 }
             },
@@ -603,24 +605,34 @@ private suspend fun PointerInputScope.handleGesture(
         awaitFirstDown()
         do {
             val event = awaitPointerEvent()
-            /** ボタン等で消費されていないポインターのみを抽出 */
-            val pointers = event.changes.filter { it.pressed && !it.isConsumed }
             
-            if (useSwipeGesture && pointers.size == 1) {
+            var pointerCount = 0
+            var p1Index = -1
+            var p2Index = -1
+
+            event.changes.fastForEach { change ->
+                if (change.pressed && !change.isConsumed) {
+                    pointerCount++
+                    if (p1Index == -1) p1Index = event.changes.indexOf(change)
+                    else if (p2Index == -1) p2Index = event.changes.indexOf(change)
+                }
+            }
+
+            if (useSwipeGesture && pointerCount == 1) {
                 /** 1本指スワイプによるサイズ変更（高感度設定） */
-                val change = pointers.first()
+                val change = event.changes[p1Index]
                 val sensitivity = SWIPE_SENSITIVITY
                 val dx = change.position.x - change.previousPosition.x
                 val dy = change.position.y - change.previousPosition.y
                 if (abs(dx) > abs(dy)) onUpdateBox(dx * sensitivity, 0f)
                 else onUpdateBox(0f, dy * sensitivity)
                 change.consume()
-            } else if (!useSwipeGesture && pointers.size == 2) {
+            } else if (!useSwipeGesture && pointerCount == 2) {
                 /** 2本指ピンチによるサイズ変更 */
-                val p1 = pointers[0].position
-                val p2 = pointers[1].position
-                val pp1 = pointers[0].previousPosition
-                val pp2 = pointers[1].previousPosition
+                val p1 = event.changes[p1Index].position
+                val p2 = event.changes[p2Index].position
+                val pp1 = event.changes[p1Index].previousPosition
+                val pp2 = event.changes[p2Index].previousPosition
                 
                 val dx = p1.x - p2.x
                 val dy = p1.y - p2.y
@@ -639,9 +651,9 @@ private suspend fun PointerInputScope.handleGesture(
                     val prevDistY = abs(pp1.y - pp2.y)
                     if (prevDistY > 0) onUpdateBox(0f, (currentDistY / prevDistY - 1f) * PINCH_SENSITIVITY)
                 }
-                event.changes.forEach { it.consume() }
+                event.changes.fastForEach { it.consume() }
             }
-        } while (event.changes.any { it.pressed })
+        } while (event.changes.fastAny { it.pressed })
     }
 }
 
