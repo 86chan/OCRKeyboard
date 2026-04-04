@@ -17,3 +17,7 @@
 ## 2025-04-03 - [Offload Heavy CPU Operations to Background Thread in Coroutines]
 **Learning:** In Android, invoking a `suspendCancellableCoroutine` block directly from the Main thread executing heavy CPU-bound tasks (like `BitmapFactory.decodeByteArray` or `BitmapRegionDecoder.decodeRegion`) will block the UI thread, causing jank and unresponsiveness. Using a `suspend` keyword does not inherently execute the code on a background thread; it merely suspends execution of the coroutine.
 **Action:** When creating a `suspend` function that performs heavy CPU operations within a coroutine, wrap the block with `withContext(Dispatchers.Default)` to ensure the workload is offloaded to a background thread pool, maintaining a smooth and responsive UI.
+
+## 2025-04-04 - [Avoid List Allocation in Compose Gesture Loops]
+**Learning:** In Jetpack Compose, processing gesture inputs inside a `do-while` loop with `awaitPointerEvent()` happens very frequently. Using standard collection operations like `event.changes.filter { ... }` or `event.changes.any { ... }` allocates a new list or iterator on every single frame. This triggers frequent Garbage Collection, leading to visible UI stuttering (jank).
+**Action:** Always replace standard `.filter {}` and `.any {}` calls in high-frequency compose blocks with `androidx.compose.ui.util.fastForEach` and `fastAny`. When you need to filter and count, use local integer variables to track counts and target indices rather than allocating temporary lists.
