@@ -2,13 +2,23 @@ name: Android Pull Request Check
 
 on:
   pull_request:
-    branches: [ "main" ] # mainへのPR時のみ実行
-    types: [opened, synchronize, reopened] # PR作成、追記、再開時にトリガー
+    branches: [ "main" ]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
+
+# 同一PRで新しいコミットがプッシュされたら、古い実行を自動キャンセルしてリソースを節約する
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    # JUnitレポート作成などのために書き込み権限を付与
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
 
     steps:
     - name: Checkout code
@@ -19,28 +29,35 @@ jobs:
       with:
         java-version: '21'
         distribution: 'temurin'
-        cache: gradle
+
+    # Gradleのセットアップとキャッシュ管理（setup-javaのcacheより高性能）
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    # 1. ユニットテストの実行
-    - name: Run Unit Tests
-      run: ./gradlew testDebugUnitTest
+    # テストとビルドをまとめて実行（効率化）
+    # --stacktrace: エラー時の詳細確認用
+    # --no-daemon: CI環境ではデーモン不要
+    - name: Run Tests and Build Check
+      run: ./gradlew testDebugUnitTest assembleDebug --stacktrace --no-daemon
 
-    # 2. ビルドができるか確認（APKは作成するが保存はしない）
-    - name: Check Build
-      run: ./gradlew assembleDebug
-
+    # テスト結果の可視化（PRのChecksタブに結果を表示）
     - name: Publish Test Report
       uses: mikepenz/action-junit-report@v4
-      if: always() # テストが失敗してもレポートは出す
+      if: always()
       with:
         report_paths: '**/build/test-results/testDebugUnitTest/*.xml'
+        detailed_summary: true
+        include_passed_tests: true
 
-    - name: Upload Test Results
+    # 失敗時のみ、デバッグに役立つ成果物をアップロード
+    - name: Upload Test Results on Failure
       uses: actions/upload-artifact@v4
-      if: failure() # テスト失敗時のみ実行
+      if: failure()
       with:
         name: test-results
-        path: app/build/test-results/testDebugUnitTest/
+        path: |
+          **/build/test-results/testDebugUnitTest/
+          **/build/reports/tests/testDebugUnitTest/

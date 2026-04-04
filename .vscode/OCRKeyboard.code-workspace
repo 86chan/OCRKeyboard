@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		}
+	],
+	"settings": {},
+	"extensions": {
+		"recommendations": [
+			"jetbrains.kotlin",
+			"esafirm.kotlin-formatter",
+			"vscjava.vscode-gradle"
+		]
+	}
+}
