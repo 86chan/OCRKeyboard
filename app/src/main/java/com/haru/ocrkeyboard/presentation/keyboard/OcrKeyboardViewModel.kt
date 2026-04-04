@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.haru.ocrkeyboard.data.local.SettingsRepository
-import com.haru.ocrkeyboard.BuildConfig
 import com.haru.ocrkeyboard.domain.usecase.RecognizeTextUseCase
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -171,11 +170,7 @@ class OcrKeyboardViewModel(
                 }
             }
             result.onFailure { error ->
-                if (BuildConfig.DEBUG) {
-                    Log.e("OcrKeyboard", "Recognition failed", error)
-                } else {
-                    Log.e("OcrKeyboard", "Recognition failed: ${error::class.simpleName}")
-                }
+                Log.e("OcrKeyboard", "Recognition failed: ${error::class.simpleName}")
                 _state.update { it.copy(isRecognizing = false, errorMessage = "認識中にエラーが発生しました") }
                 scheduleErrorDismissal()
             }
