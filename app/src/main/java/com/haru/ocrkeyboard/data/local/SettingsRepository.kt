@@ -19,9 +19,16 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
  *
  * SharedPreferencesに代わるDataStoreによる非同期・スレッドセーフなデータ管理
  *
- * @param context アプリケーションコンテキスト
+ * @param dataStore 設定を保存するDataStoreインスタンス
  */
-class SettingsRepository(private val context: Context) {
+class SettingsRepository(private val dataStore: DataStore<Preferences>) {
+
+    /**
+     * コンテキストからDataStoreを取得するセカンダリコンストラクタ（既存コードとの互換性用）
+     *
+     * @param context アプリケーションコンテキスト
+     */
+    constructor(context: Context) : this(context.dataStore)
 
     private companion object {
         val USE_SWIPE_GESTURE = booleanPreferencesKey("use_swipe_gesture")
@@ -33,7 +40,7 @@ class SettingsRepository(private val context: Context) {
      *
      * デフォルト値はfalse（ピンチ操作）
      */
-    val useSwipeGestureFlow: Flow<Boolean> = context.dataStore.data
+    val useSwipeGestureFlow: Flow<Boolean> = dataStore.data
         .map { preferences ->
             preferences[USE_SWIPE_GESTURE] ?: false
         }
@@ -43,7 +50,7 @@ class SettingsRepository(private val context: Context) {
      *
      * デフォルト値はfalse
      */
-    val useJapaneseRecognitionFlow: Flow<Boolean> = context.dataStore.data
+    val useJapaneseRecognitionFlow: Flow<Boolean> = dataStore.data
         .map { preferences ->
             preferences[USE_JAPANESE_RECOGNITION] ?: false
         }
@@ -54,7 +61,7 @@ class SettingsRepository(private val context: Context) {
      * @param isEnabled 有効化フラグ
      */
     suspend fun setUseSwipeGesture(isEnabled: Boolean) {
-        context.dataStore.edit { preferences ->
+        dataStore.edit { preferences ->
             preferences[USE_SWIPE_GESTURE] = isEnabled
         }
     }
@@ -65,7 +72,7 @@ class SettingsRepository(private val context: Context) {
      * @param isEnabled 有効化フラグ
      */
     suspend fun setUseJapaneseRecognition(isEnabled: Boolean) {
-        context.dataStore.edit { preferences ->
+        dataStore.edit { preferences ->
             preferences[USE_JAPANESE_RECOGNITION] = isEnabled
         }
     }
