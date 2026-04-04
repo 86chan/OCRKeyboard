@@ -1,0 +1,15 @@
+--- app/src/main/java/com/haru/ocrkeyboard/data/local/SettingsRepository.kt
++++ app/src/main/java/com/haru/ocrkeyboard/data/local/SettingsRepository.kt
+@@ -29,8 +29,13 @@
+      */
+     constructor(context: Context) : this(context.dataStore)
+
++    /**
++     * DataStoreのキー定義
++     */
+     private companion object {
++        /** スワイプジェスチャー有効可否のキー */
+         val USE_SWIPE_GESTURE = booleanPreferencesKey("use_swipe_gesture")
++        /** 日本語認識有効可否のキー */
+         val USE_JAPANESE_RECOGNITION = booleanPreferencesKey("use_japanese_recognition")
+     }
