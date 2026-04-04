@@ -17,3 +17,11 @@
 ## 2025-04-03 - [Offload Heavy CPU Operations to Background Thread in Coroutines]
 **Learning:** In Android, invoking a `suspendCancellableCoroutine` block directly from the Main thread executing heavy CPU-bound tasks (like `BitmapFactory.decodeByteArray` or `BitmapRegionDecoder.decodeRegion`) will block the UI thread, causing jank and unresponsiveness. Using a `suspend` keyword does not inherently execute the code on a background thread; it merely suspends execution of the coroutine.
 **Action:** When creating a `suspend` function that performs heavy CPU operations within a coroutine, wrap the block with `withContext(Dispatchers.Default)` to ensure the workload is offloaded to a background thread pool, maintaining a smooth and responsive UI.
+
+## 2025-04-04 - [Optimize CameraX Capture Latency]
+**Learning:** In CameraX, the default `ImageCapture.Builder().build()` uses `CAPTURE_MODE_MAXIMIZE_QUALITY`. This mode prioritizes image quality (HDR, noise reduction), which causes a noticeable shutter delay (~500ms). For OCR applications where pure speed is preferred over post-processing, this latency is detrimental.
+**Action:** Always configure `ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)` when capturing images for computer vision pipelines where speed is critical.
+
+## 2025-04-04 - [Lazy Initialize ML Kit Models]
+**Learning:** Eagerly initializing ML Kit clients (`TextRecognition.getClient(...)`) as standard properties in a Repository or Service loads the underlying models into memory immediately upon instantiation. In a custom keyboard service, the user might open the keyboard just to type, never triggering the OCR scanner. Eager initialization in this scenario needlessly inflates startup time and memory usage.
+**Action:** Always use `by lazy` for instantiating ML Kit clients or heavy SDK objects so they are only loaded into memory when their specific functionality is actually requested by the user.
