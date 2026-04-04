@@ -185,7 +185,7 @@ fun OcrKeyboardScreen(
     }
 
     /** 画像キャプチャ用インスタンスの保持 */
-    val imageCapture = remember { ImageCapture.Builder().build() }
+    val imageCapture = remember { ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build() }
     
     OcrKeyboardContent(
         state = state,

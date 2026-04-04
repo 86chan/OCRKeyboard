@@ -25,12 +25,16 @@ class OcrRepositoryImpl : OcrRepository {
     /**
      * ラテン文字用認識クライアント
      */
-    private val latinRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    private val latinRecognizer by lazy {
+        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    }
 
     /**
      * 日本語用認識クライアント
      */
-    private val japaneseRecognizer = TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
+    private val japaneseRecognizer by lazy {
+        TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
+    }
 
 /**
      * 画像データからのテキスト抽出
