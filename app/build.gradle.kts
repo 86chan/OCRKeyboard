@@ -118,6 +118,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     testImplementation(libs.mockito.core)
+    testImplementation(libs.robolectric)
     "ksp"(libs.moshi.kotlin.codegen)
     "ksp"(libs.androidx.room.compiler)
 }
