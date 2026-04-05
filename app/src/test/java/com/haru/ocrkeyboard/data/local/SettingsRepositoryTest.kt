@@ -14,12 +14,13 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
 
 /**
  * [SettingsRepository]の単体テスト
  *
  * ローカルファイルシステム上のテスト用DataStoreを作成し、
- * 各設定項目の更新とフローの放射が正しく行われることを検証する。
+ * Robolectricを回避しつつ各設定項目の更新とフローの放射が正しく行われることを検証する。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsRepositoryTest {
@@ -29,7 +30,7 @@ class SettingsRepositoryTest {
     val tmpFolder = TemporaryFolder()
 
     private lateinit var testDataStore: DataStore<Preferences>
-    private lateinit var repository: SettingsRepository
+    private lateinit var settingsRepository: SettingsRepository
     private val testDispatcher = UnconfinedTestDispatcher()
     private val testScope = TestScope(testDispatcher + Job())
 
@@ -47,60 +48,83 @@ class SettingsRepositoryTest {
             produceFile = { testFile }
         )
 
-        repository = SettingsRepository(testDataStore)
+        settingsRepository = SettingsRepository(testDataStore)
     }
 
     /**
-     * 日本語認識設定を更新し、フローから正しい値が読み取れることの検証。
+     * 初期状態の検証
      *
      * [事前条件 (Given)]
-     * 初回実行時のため、DataStoreに設定値が未保存であり、
-     * [SettingsRepository.useJapaneseRecognitionFlow] の初期値がfalseである状態。
+     * DataStoreが新規作成された状態。
      *
      * [実行 (When)]
-     * [SettingsRepository.setUseJapaneseRecognition] を引数trueで呼び出す。
+     * 各フローの最初の値を取得する。
      *
      * [検証 (Then)]
-     * [SettingsRepository.useJapaneseRecognitionFlow] から取得される値がtrueに更新されていること。
+     * スワイプジェスチャーと日本語認識の初期値がfalseであること。
      */
     @Test
-    fun setUseJapaneseRecognition_updatesValueAndFlowEmitsCorrectly() = runTest {
-        // Given
-        val initialValue = repository.useJapaneseRecognitionFlow.first()
-        assertEquals("初期状態はfalseであるべき", false, initialValue)
-
+    fun defaultValuesAreFalse() = runTest {
         // When
-        repository.setUseJapaneseRecognition(true)
+        val useSwipe = settingsRepository.useSwipeGestureFlow.first()
+        val useJapanese = settingsRepository.useJapaneseRecognitionFlow.first()
 
         // Then
-        val updatedValue = repository.useJapaneseRecognitionFlow.first()
-        assertEquals("更新後はtrueであるべき", true, updatedValue)
+        assertEquals(false, useSwipe)
+        assertEquals(false, useJapanese)
     }
 
     /**
-     * スワイプジェスチャー設定を更新し、フローから正しい値が読み取れることの検証。
+     * スワイプジェスチャー設定更新の検証
      *
      * [事前条件 (Given)]
-     * 初回実行時のため、DataStoreに設定値が未保存であり、
-     * [SettingsRepository.useSwipeGestureFlow] の初期値がfalseである状態。
+     * DataStoreが初期化された状態。
      *
      * [実行 (When)]
-     * [SettingsRepository.setUseSwipeGesture] を引数trueで呼び出す。
+     * [SettingsRepository.setUseSwipeGesture] をtrue、その後falseで呼び出す。
      *
      * [検証 (Then)]
-     * [SettingsRepository.useSwipeGestureFlow] から取得される値がtrueに更新されていること。
+     * それぞれの呼び出し後に [SettingsRepository.useSwipeGestureFlow] から正しい値が放出されること。
      */
     @Test
-    fun setUseSwipeGesture_updatesValueAndFlowEmitsCorrectly() = runTest {
-        // Given
-        val initialValue = repository.useSwipeGestureFlow.first()
-        assertEquals("初期状態はfalseであるべき", false, initialValue)
+    fun setUseSwipeGesture_updatesValue() = runTest {
+        // When: trueに更新
+        settingsRepository.setUseSwipeGesture(true)
+        val useSwipe = settingsRepository.useSwipeGestureFlow.first()
+        // Then: trueであること
+        assertEquals(true, useSwipe)
 
-        // When
-        repository.setUseSwipeGesture(true)
+        // When: falseに更新
+        settingsRepository.setUseSwipeGesture(false)
+        val useSwipeFalse = settingsRepository.useSwipeGestureFlow.first()
+        // Then: falseであること
+        assertEquals(false, useSwipeFalse)
+    }
 
-        // Then
-        val updatedValue = repository.useSwipeGestureFlow.first()
-        assertEquals("更新後はtrueであるべき", true, updatedValue)
+    /**
+     * 日本語認識設定更新の検証
+     *
+     * [事前条件 (Given)]
+     * DataStoreが初期化された状態。
+     *
+     * [実行 (When)]
+     * [SettingsRepository.setUseJapaneseRecognition] をtrue、その後falseで呼び出す。
+     *
+     * [検証 (Then)]
+     * それぞれの呼び出し後に [SettingsRepository.useJapaneseRecognitionFlow] から正しい値が放出されること。
+     */
+    @Test
+    fun setUseJapaneseRecognition_updatesValue() = runTest {
+        // When: trueに更新
+        settingsRepository.setUseJapaneseRecognition(true)
+        val useJapanese = settingsRepository.useJapaneseRecognitionFlow.first()
+        // Then: trueであること
+        assertEquals(true, useJapanese)
+
+        // When: falseに更新
+        settingsRepository.setUseJapaneseRecognition(false)
+        val useJapaneseFalse = settingsRepository.useJapaneseRecognitionFlow.first()
+        // Then: falseであること
+        assertEquals(false, useJapaneseFalse)
     }
 }
