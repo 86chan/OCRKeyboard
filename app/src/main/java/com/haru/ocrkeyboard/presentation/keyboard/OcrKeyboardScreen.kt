@@ -41,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -372,6 +373,8 @@ private fun ScanningOverlay(
     boxHeightRatioProvider: () -> Float,
     boxTopRatioProvider: () -> Float
 ) {
+    val strokeWidthPx = with(LocalDensity.current) { 2.dp.toPx() }
+    val stroke = remember(strokeWidthPx) { Stroke(width = strokeWidthPx) }
     Canvas(
         modifier = Modifier
             .fillMaxSize()
@@ -396,7 +399,7 @@ private fun ScanningOverlay(
             topLeft = Offset(left, top),
             size = Size(boxWidth, boxHeight),
             cornerRadius = CornerRadius(cornerRadius, cornerRadius),
-            style = Stroke(width = 2.dp.toPx())
+            style = stroke
         )
     }
 }
@@ -607,32 +610,32 @@ private suspend fun PointerInputScope.handleGesture(
             val event = awaitPointerEvent()
             
             var pointerCount = 0
-            var p1Index = -1
-            var p2Index = -1
+            var p1Change: androidx.compose.ui.input.pointer.PointerInputChange? = null
+            var p2Change: androidx.compose.ui.input.pointer.PointerInputChange? = null
 
             event.changes.fastForEach { change ->
                 if (change.pressed && !change.isConsumed) {
                     pointerCount++
-                    if (p1Index == -1) p1Index = event.changes.indexOf(change)
-                    else if (p2Index == -1) p2Index = event.changes.indexOf(change)
+                    if (p1Change == null) p1Change = change
+                    else if (p2Change == null) p2Change = change
                 }
             }
 
-            if (useSwipeGesture && pointerCount == 1) {
+            if (useSwipeGesture && pointerCount == 1 && p1Change != null) {
                 /** 1本指スワイプによるサイズ変更（高感度設定） */
-                val change = event.changes[p1Index]
+                val change = p1Change
                 val sensitivity = SWIPE_SENSITIVITY
                 val dx = change.position.x - change.previousPosition.x
                 val dy = change.position.y - change.previousPosition.y
                 if (abs(dx) > abs(dy)) onUpdateBox(dx * sensitivity, 0f)
                 else onUpdateBox(0f, dy * sensitivity)
                 change.consume()
-            } else if (!useSwipeGesture && pointerCount == 2) {
+            } else if (!useSwipeGesture && pointerCount == 2 && p1Change != null && p2Change != null) {
                 /** 2本指ピンチによるサイズ変更 */
-                val p1 = event.changes[p1Index].position
-                val p2 = event.changes[p2Index].position
-                val pp1 = event.changes[p1Index].previousPosition
-                val pp2 = event.changes[p2Index].previousPosition
+                val p1 = p1Change.position
+                val p2 = p2Change.position
+                val pp1 = p1Change.previousPosition
+                val pp2 = p2Change.previousPosition
                 
                 val dx = p1.x - p2.x
                 val dy = p1.y - p2.y

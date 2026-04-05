@@ -29,3 +29,7 @@
 ## 2025-04-04 - [Avoid List Allocation in Compose Gesture Loops]
 **Learning:** In Jetpack Compose, processing gesture inputs inside a `do-while` loop with `awaitPointerEvent()` happens very frequently. Using standard collection operations like `event.changes.filter { ... }` or `event.changes.any { ... }` allocates a new list or iterator on every single frame. This triggers frequent Garbage Collection, leading to visible UI stuttering (jank).
 **Action:** Always replace standard `.filter {}` and `.any {}` calls in high-frequency compose blocks with `androidx.compose.ui.util.fastForEach` and `fastAny`. When you need to filter and count, use local integer variables to track counts and target indices rather than allocating temporary lists.
+
+## 2025-04-05 - [Avoid Object Allocation in Compose Canvas and Gesture Loops]
+**Learning:** In Jetpack Compose, the `Canvas` draw phase and gesture `pointerInput` loops execute extremely frequently (up to 120 times per second). Allocating objects (like `Stroke`) inside a `Canvas` block, or performing O(N) operations like `event.changes.indexOf(change)` inside an already O(N) `fastForEach` loop, creates massive GC churn and unnecessary CPU overhead, resulting in visible UI jank during interactions.
+**Action:** Always cache draw-related objects using `remember` outside the `Canvas` block. During high-frequency gesture processing, use direct object references instead of repeated index lookups.
