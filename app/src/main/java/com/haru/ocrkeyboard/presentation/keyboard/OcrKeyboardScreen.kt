@@ -76,6 +76,8 @@ import kotlin.math.atan2
 import kotlinx.coroutines.delay
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.platform.LocalDensity
 
 /** 削除キーの初回入力待機時間（ミリ秒） */
 private const val DELETE_KEY_INITIAL_DELAY_MS = 400L
@@ -372,6 +374,11 @@ private fun ScanningOverlay(
     boxHeightRatioProvider: () -> Float,
     boxTopRatioProvider: () -> Float
 ) {
+    val density = LocalDensity.current
+    val strokeWidthPx = with(density) { 2.dp.toPx() }
+    // 線の太さが変わらない限り、Strokeオブジェクトを再利用する
+    val stroke = remember(strokeWidthPx) { Stroke(width = strokeWidthPx) }
+
     Canvas(
         modifier = Modifier
             .fillMaxSize()
@@ -396,7 +403,7 @@ private fun ScanningOverlay(
             topLeft = Offset(left, top),
             size = Size(boxWidth, boxHeight),
             cornerRadius = CornerRadius(cornerRadius, cornerRadius),
-            style = Stroke(width = 2.dp.toPx())
+            style = stroke // キャッシュしたstrokeを使用
         )
     }
 }
@@ -605,35 +612,36 @@ private suspend fun PointerInputScope.handleGesture(
         awaitFirstDown()
         do {
             val event = awaitPointerEvent()
-            
-            var pointerCount = 0
-            var p1Index = -1
-            var p2Index = -1
 
+            var pointerCount = 0
+            var p1Change: PointerInputChange? = null
+            var p2Change: PointerInputChange? = null
+
+            // O(N)の走査の中で、必要なオブジェクトの参照だけを直接取得する
             event.changes.fastForEach { change ->
                 if (change.pressed && !change.isConsumed) {
                     pointerCount++
-                    if (p1Index == -1) p1Index = event.changes.indexOf(change)
-                    else if (p2Index == -1) p2Index = event.changes.indexOf(change)
+                    if (p1Change == null) p1Change = change
+                    else if (p2Change == null) p2Change = change
                 }
             }
 
-            if (useSwipeGesture && pointerCount == 1) {
+            if (useSwipeGesture && pointerCount == 1 && p1Change != null) {
                 /** 1本指スワイプによるサイズ変更（高感度設定） */
-                val change = event.changes[p1Index]
+                val change = p1Change
                 val sensitivity = SWIPE_SENSITIVITY
                 val dx = change.position.x - change.previousPosition.x
                 val dy = change.position.y - change.previousPosition.y
                 if (abs(dx) > abs(dy)) onUpdateBox(dx * sensitivity, 0f)
                 else onUpdateBox(0f, dy * sensitivity)
                 change.consume()
-            } else if (!useSwipeGesture && pointerCount == 2) {
+            } else if (!useSwipeGesture && pointerCount == 2 && p1Change != null && p2Change != null) {
                 /** 2本指ピンチによるサイズ変更 */
-                val p1 = event.changes[p1Index].position
-                val p2 = event.changes[p2Index].position
-                val pp1 = event.changes[p1Index].previousPosition
-                val pp2 = event.changes[p2Index].previousPosition
-                
+                val p1 = p1Change.position
+                val p2 = p2Change.position
+                val pp1 = p1Change.previousPosition
+                val pp2 = p2Change.previousPosition
+
                 val dx = p1.x - p2.x
                 val dy = p1.y - p2.y
                 val angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble()))
