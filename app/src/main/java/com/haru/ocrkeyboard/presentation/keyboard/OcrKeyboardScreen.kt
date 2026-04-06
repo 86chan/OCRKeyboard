@@ -63,6 +63,7 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -372,6 +373,10 @@ private fun ScanningOverlay(
     boxHeightRatioProvider: () -> Float,
     boxTopRatioProvider: () -> Float
 ) {
+    val density = LocalDensity.current
+    val strokeWidthPx = with(density) { 2.dp.toPx() }
+    val stroke = remember(strokeWidthPx) { Stroke(width = strokeWidthPx) }
+
     Canvas(
         modifier = Modifier
             .fillMaxSize()
@@ -396,7 +401,7 @@ private fun ScanningOverlay(
             topLeft = Offset(left, top),
             size = Size(boxWidth, boxHeight),
             cornerRadius = CornerRadius(cornerRadius, cornerRadius),
-            style = Stroke(width = 2.dp.toPx())
+            style = stroke
         )
     }
 }
@@ -609,13 +614,15 @@ private suspend fun PointerInputScope.handleGesture(
             var pointerCount = 0
             var p1Index = -1
             var p2Index = -1
+            var currentIndex = 0
 
             event.changes.fastForEach { change ->
                 if (change.pressed && !change.isConsumed) {
                     pointerCount++
-                    if (p1Index == -1) p1Index = event.changes.indexOf(change)
-                    else if (p2Index == -1) p2Index = event.changes.indexOf(change)
+                    if (p1Index == -1) p1Index = currentIndex
+                    else if (p2Index == -1) p2Index = currentIndex
                 }
+                currentIndex++
             }
 
             if (useSwipeGesture && pointerCount == 1) {
