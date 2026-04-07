@@ -29,3 +29,7 @@
 ## 2025-04-04 - [Avoid List Allocation in Compose Gesture Loops]
 **Learning:** In Jetpack Compose, processing gesture inputs inside a `do-while` loop with `awaitPointerEvent()` happens very frequently. Using standard collection operations like `event.changes.filter { ... }` or `event.changes.any { ... }` allocates a new list or iterator on every single frame. This triggers frequent Garbage Collection, leading to visible UI stuttering (jank).
 **Action:** Always replace standard `.filter {}` and `.any {}` calls in high-frequency compose blocks with `androidx.compose.ui.util.fastForEach` and `fastAny`. When you need to filter and count, use local integer variables to track counts and target indices rather than allocating temporary lists.
+
+## 2025-04-10 - [Avoid Nested Iteration on Sorted Data]
+**Learning:** In `OcrRepositoryImpl`, when grouping OCR text lines into rows, the lines are pre-sorted by their vertical position (`top` coordinate). Searching the entire list of already-created rows using `.find` to see which row a line belongs to creates an O(N²) nested loop. However, because the data is strictly sorted, a new line will only ever mathematically belong to the *most recently created* row, or it will start a new row. There is no need to iterate backwards through older rows.
+**Action:** When grouping linearly dependent data that has been pre-sorted, replace `O(N)` search operations like `.find` with `O(1)` operations like `.lastOrNull()` to eliminate nested loops and turn O(N²) complexity into O(N).
