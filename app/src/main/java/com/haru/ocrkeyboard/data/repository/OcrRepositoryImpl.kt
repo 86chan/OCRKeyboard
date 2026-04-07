@@ -145,8 +145,7 @@ class OcrRepositoryImpl : OcrRepository {
 
         // 垂直方向の座標による行グループ化（微細な傾きの許容）
         allLines.sortedBy { it.boundingBox?.top ?: 0 }.forEach { line ->
-            // allLinesは既にtop座標でソート済みのため、新しい行は常に「最後に作成された行」に属するか、
-            // または「新しい行の開始」となる。過去の行を遡って検索(O(N^2))する必要はなく、最後の行(O(1))だけをチェックすればよい。
+            // Y座標でソート済みのため、直前の行(最後のグループ)のみを判定対象とする
             val row = rows.lastOrNull()?.takeIf { existingRow ->
                 val firstBox = existingRow.first().boundingBox ?: return@takeIf false
                 val lineBox = line.boundingBox ?: return@takeIf false
