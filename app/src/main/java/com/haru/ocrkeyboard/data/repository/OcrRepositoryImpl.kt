@@ -144,6 +144,8 @@ class OcrRepositoryImpl : OcrRepository {
         val rows = mutableListOf<MutableList<Text.Line>>()
 
         // 垂直方向の座標による行グループ化（微細な傾きの許容）
+        // 事前にY座標でソートされているため、全行（O(N)）を検索する必要はない。
+        // 直前のグループ（lastOrNull）とのみ比較することで、計算量をO(N^2)からO(N)へ削減する。
         allLines.sortedBy { it.boundingBox?.top ?: 0 }.forEach { line ->
             // Y座標でソート済みのため、直前の行(最後のグループ)のみを判定対象とする
             val row = rows.lastOrNull()?.takeIf { existingRow ->
