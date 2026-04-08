@@ -29,3 +29,7 @@
 ## 2025-04-04 - [Avoid List Allocation in Compose Gesture Loops]
 **Learning:** In Jetpack Compose, processing gesture inputs inside a `do-while` loop with `awaitPointerEvent()` happens very frequently. Using standard collection operations like `event.changes.filter { ... }` or `event.changes.any { ... }` allocates a new list or iterator on every single frame. This triggers frequent Garbage Collection, leading to visible UI stuttering (jank).
 **Action:** Always replace standard `.filter {}` and `.any {}` calls in high-frequency compose blocks with `androidx.compose.ui.util.fastForEach` and `fastAny`. When you need to filter and count, use local integer variables to track counts and target indices rather than allocating temporary lists.
+
+## 2025-04-08 - [Optimize Sequential Grouping with O(1) Checks]
+**Learning:** When iterating over pre-sorted data to group items sequentially (like grouping OCR text lines by their vertical coordinates), searching through the entire result list `list.find { ... }` for every new item creates a nested loop, resulting in O(N^2) complexity. Because the data is already sorted, the matching group (if any) will almost always be the most recently created one.
+**Action:** When grouping pre-sorted sequential data, optimize from O(N^2) to O(N) by checking only the last element of the output list using O(1) checks like `list.lastOrNull()?.takeIf { ... }` instead of using `find` or `firstOrNull` on the whole list.
