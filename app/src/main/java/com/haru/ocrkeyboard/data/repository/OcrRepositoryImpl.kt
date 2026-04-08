@@ -144,10 +144,12 @@ class OcrRepositoryImpl : OcrRepository {
         val rows = mutableListOf<MutableList<Text.Line>>()
 
         // 垂直方向の座標による行グループ化（微細な傾きの許容）
+        // 事前にY座標でソートされているため、全行（O(N)）を検索する必要はない。
+        // 直前のグループ（lastOrNull）とのみ比較することで、計算量をO(N^2)からO(N)へ削減する。
         allLines.sortedBy { it.boundingBox?.top ?: 0 }.forEach { line ->
-            val row = rows.find { existingRow ->
-                val firstBox = existingRow.first().boundingBox ?: return@find false
-                val lineBox = line.boundingBox ?: return@find false
+            val row = rows.lastOrNull()?.takeIf { existingRow ->
+                val firstBox = existingRow.first().boundingBox ?: return@takeIf false
+                val lineBox = line.boundingBox ?: return@takeIf false
                 val threshold = firstBox.height() / 2
                 abs(lineBox.top - firstBox.top) < threshold
             }
