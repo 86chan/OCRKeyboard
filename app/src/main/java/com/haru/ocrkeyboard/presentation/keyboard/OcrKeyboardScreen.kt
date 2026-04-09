@@ -562,8 +562,12 @@ private fun DeleteButton(
                     isDeletePressed = true
                     do {
                         val event = awaitPointerEvent()
-                        event.changes.fastForEach { it.consume() }
-                    } while (event.changes.fastAny { it.pressed })
+                        var anyPressed = false
+                        event.changes.fastForEach { change ->
+                            change.consume()
+                            if (change.pressed) anyPressed = true
+                        }
+                    } while (anyPressed)
                     isDeletePressed = false
                 }
             },
@@ -616,9 +620,11 @@ private suspend fun PointerInputScope.handleGesture(
             var pointerCount = 0
             var p1Change: PointerInputChange? = null
             var p2Change: PointerInputChange? = null
+            var anyPressed = false
 
             // O(N)の走査の中で、必要なオブジェクトの参照だけを直接取得する
             event.changes.fastForEach { change ->
+                if (change.pressed) anyPressed = true
                 if (change.pressed && !change.isConsumed) {
                     pointerCount++
                     if (p1Change == null) p1Change = change
@@ -661,7 +667,7 @@ private suspend fun PointerInputScope.handleGesture(
                 }
                 event.changes.fastForEach { it.consume() }
             }
-        } while (event.changes.fastAny { it.pressed })
+        } while (anyPressed)
     }
 }
 
