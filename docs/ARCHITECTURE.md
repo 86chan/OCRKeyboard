@@ -1,22 +1,22 @@
-# Architecture Overview
+# アーキテクチャ概要
 
-This document outlines the core architecture and data flow for the OCR Keyboard application.
+本書は、OCR Keyboardアプリケーションのコアアーキテクチャとデータフローについて説明します。
 
-## Core Components
+## コアコンポーネント
 
-1.  **`OcrKeyboardService`**: The entry point of the application. It extends `LifecycleInputMethodService` (a wrapper around Android's `InputMethodService` to support Jetpack Compose). It is responsible for bridging the UI layer with the Android input system via `InputConnection`.
-2.  **UI Layer (Jetpack Compose)**: `OcrKeyboardScreen` and its sub-components render the camera preview, controls, and recognition results. The UI strictly adheres to Unidirectional Data Flow (UDF).
-3.  **`OcrKeyboardViewModel`**: Manages the UI state (`OcrKeyboardState`) and processes user intents (`OcrKeyboardIntent`). It acts as a mediator between the UI and the Domain layer.
-4.  **Domain & Data Layers**: `RecognizeTextUseCase` encapsulates the OCR logic, delegating to `OcrRepositoryImpl`. The repository handles the heavy lifting of image cropping via `BitmapRegionDecoder` and text extraction using Google ML Kit.
+1.  **`OcrKeyboardService`**: アプリケーションのエントリーポイント。`LifecycleInputMethodService`（Jetpack ComposeをサポートするためのAndroidの`InputMethodService`のラッパー）を拡張。`InputConnection`を介したUI層とAndroidの入力システムの橋渡し。
+2.  **UI層 (Jetpack Compose)**: `OcrKeyboardScreen`とそのサブコンポーネントによるカメラプレビュー、コントロール、認識結果の描画。UIの単方向データフロー（UDF）の厳格な遵守。
+3.  **`OcrKeyboardViewModel`**: UIの状態（`OcrKeyboardState`）の管理、およびユーザーのインテント（`OcrKeyboardIntent`）の処理。UI層とドメイン層間のメディエーター機能。
+4.  **ドメイン・データ層**: `RecognizeTextUseCase`によるOCRロジックのカプセル化と`OcrRepositoryImpl`への委譲。リポジトリによる`BitmapRegionDecoder`を使用した画像の切り抜きや、Google ML Kitを使用したテキスト抽出などの処理。
 
-## OCR Data Flow
+## OCRデータフロー
 
-The following sequence diagram illustrates the end-to-end process from the moment a user captures an image to the text being inserted into the target application.
+以下のシーケンス図は、ユーザーが画像をキャプチャしてから、対象のアプリケーションにテキストが挿入されるまでのエンドツーエンドのプロセスを示しています。
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User
+    actor User as ユーザー
     participant UI as OcrKeyboardScreen (Compose)
     participant VM as OcrKeyboardViewModel
     participant UC as RecognizeTextUseCase
@@ -24,41 +24,41 @@ sequenceDiagram
     participant Service as OcrKeyboardService (IME)
     participant App as Target App (InputConnection)
 
-    User->>UI: Taps "Capture" button
+    User->>UI: 「スキャン」ボタンをタップ
     UI->>VM: onIntent(OcrKeyboardIntent.RecognizeText)
-    VM->>VM: Update State (isRecognizing = true)
+    VM->>VM: 状態更新 (isRecognizing = true)
 
     VM->>UC: invoke(imageBytes, rotation...)
     UC->>Repo: extractText(...)
 
     rect rgb(200, 200, 200)
         Note over Repo: Native ML Kit Processing
-        Repo->>Repo: Decode image region (BitmapRegionDecoder)
-        Repo->>Repo: Process with TextRecognition client
-        Repo->>Repo: Sort and format text blocks
+        Repo->>Repo: 画像領域のデコード (BitmapRegionDecoder)
+        Repo->>Repo: TextRecognitionクライアントによる処理
+        Repo->>Repo: テキストブロックのソートとフォーマット
     end
 
     Repo-->>UC: Result.success(text)
     UC-->>VM: Result.success(text)
 
-    VM->>VM: Generate suggestions & Update State
-    VM-->>UI: State update (Show suggestions / result)
+    VM->>VM: 候補の生成と状態更新
+    VM-->>UI: 状態更新 (候補 / 結果の表示)
 
-    alt Auto-commit (No suggestions)
+    alt 自動入力 (候補なし)
         VM->>Service: emit(commitTextEvent)
-    else User selects suggestion
-        User->>UI: Taps suggestion
+    else ユーザーが候補を選択
+        User->>UI: 候補をタップ
         UI->>VM: onIntent(OcrKeyboardIntent.SuggestionSelected)
         VM->>Service: emit(commitTextEvent)
     end
 
     Service->>App: currentInputConnection.commitText(text)
     Service->>VM: onIntent(OcrKeyboardIntent.TextCommitted)
-    VM->>VM: Update State (Clear text)
+    VM->>VM: 状態更新 (テキストのクリア)
 ```
 
-## Key Architectural Constraints
+## 主要なアーキテクチャ制約
 
-*   **Local Processing Only**: All ML Kit processing occurs on-device. No images or extracted text are ever sent to a remote server.
-*   **Unidirectional Data Flow (UDF)**: The UI components do not directly modify state or communicate with the repository. All actions flow through intents to the ViewModel.
-*   **Memory Efficiency**: The repository uses `BitmapRegionDecoder` with `Bitmap.Config.RGB_565` to minimize memory allocation when cropping high-resolution camera feeds before passing them to ML Kit.
+*   **ローカル処理のみ**: すべてのML Kit処理のデバイス上での実行。画像や抽出されたテキストの外部サーバーへの送信の禁止。
+*   **単方向データフロー (UDF)**: UIコンポーネントによる直接的な状態変更やリポジトリとの通信の禁止。すべてのアクションのインテントを介したViewModelへの伝達。
+*   **メモリ効率**: `Bitmap.Config.RGB_565`を指定した`BitmapRegionDecoder`の使用による、ML Kitへの引き渡し前の高解像度カメラ映像切り抜き時のメモリ割り当ての最小化。
