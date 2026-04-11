@@ -162,11 +162,11 @@ class OcrRepositoryImpl : OcrRepository {
         }
 
         // 行ごとに水平方向へソートして結合
-        return rows.sortedBy { it.first().boundingBox?.top ?: 0 }
-            .joinToString(" ") { row ->
-                row.sortBy { it.boundingBox?.left ?: 0 }
-                row.joinToString(" ") { it.text }
-            }.trim()
+        // rowsは追加順序によって既に垂直方向(top)にソートされているため、再ソートは不要
+        return rows.joinToString(" ") { row ->
+            row.sortBy { it.boundingBox?.left ?: 0 }
+            row.joinToString(" ") { it.text }
+        }.trim()
     }
 
     /**
