@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -42,9 +43,6 @@ class OcrKeyboardViewModelTest {
         org.mockito.Mockito.`when`(mockSettings.splitDelimitersFlow).thenReturn(kotlinx.coroutines.flow.flowOf(emptyList()))
         org.mockito.Mockito.`when`(mockSettings.useSwipeGestureFlow).thenReturn(kotlinx.coroutines.flow.flowOf(false))
         org.mockito.Mockito.`when`(mockSettings.useJapaneseRecognitionFlow).thenReturn(kotlinx.coroutines.flow.flowOf(false))
-
-
-
 
         viewModel = OcrKeyboardViewModel(useCase, mockSettings)
     }
@@ -191,6 +189,142 @@ class OcrKeyboardViewModelTest {
 
         // Then
         assertEquals("", viewModel.state.value.recognizedText)
+    }
+
+    /**
+     * SuggestionSelectedインテントを受信した際にcommitTextEventが発行されることの検証。
+     *
+     * [事前条件 (Given)]
+     * ViewModelのcommitTextEventを購読している状態。
+     *
+     * [実行 (When)]
+     * SuggestionSelectedインテントを送信する。
+     *
+     * [検証 (Then)]
+     * commitTextEventにインテントで指定したテキストが発行されること。
+     */
+    @Test
+    fun onIntent_SuggestionSelected_emitsCommitTextEvent() = runTest {
+        // Given
+        val emittedEvents = mutableListOf<String>()
+        val job = kotlinx.coroutines.CoroutineScope(testDispatcher).launch {
+            viewModel.commitTextEvent.collect {
+                emittedEvents.add(it)
+            }
+        }
+        testDispatcher.scheduler.runCurrent()
+
+        // When
+        viewModel.onIntent(OcrKeyboardIntent.SuggestionSelected("候補テキスト"))
+        testDispatcher.scheduler.runCurrent()
+
+        // Then
+        assertEquals(1, emittedEvents.size)
+        assertEquals("候補テキスト", emittedEvents.first())
+
+        job.cancel()
+    }
+
+    /**
+     * DeleteKeyPressedインテントを受信した際にkeyEventが発行されることの検証。
+     *
+     * [事前条件 (Given)]
+     * ViewModelのkeyEventを購読している状態。
+     *
+     * [実行 (When)]
+     * DeleteKeyPressedインテントを送信する。
+     *
+     * [検証 (Then)]
+     * keyEventにKEYCODE_DEL（67）が発行されること。
+     */
+    @Test
+    fun onIntent_DeleteKeyPressed_emitsKeyEvent() = runTest {
+        // Given
+        val emittedEvents = mutableListOf<Int>()
+        val job = kotlinx.coroutines.CoroutineScope(testDispatcher).launch {
+            viewModel.keyEvent.collect {
+                emittedEvents.add(it)
+            }
+        }
+        testDispatcher.scheduler.runCurrent()
+
+        // When
+        viewModel.onIntent(OcrKeyboardIntent.DeleteKeyPressed)
+        testDispatcher.scheduler.runCurrent()
+
+        // Then
+        assertEquals(1, emittedEvents.size)
+        assertEquals(android.view.KeyEvent.KEYCODE_DEL, emittedEvents.first())
+
+        job.cancel()
+    }
+
+    /**
+     * EnterKeyPressedインテントを受信した際にkeyEventが発行されることの検証。
+     *
+     * [事前条件 (Given)]
+     * ViewModelのkeyEventを購読している状態。
+     *
+     * [実行 (When)]
+     * EnterKeyPressedインテントを送信する。
+     *
+     * [検証 (Then)]
+     * keyEventにKEYCODE_ENTER（66）が発行されること。
+     */
+    @Test
+    fun onIntent_EnterKeyPressed_emitsKeyEvent() = runTest {
+        // Given
+        val emittedEvents = mutableListOf<Int>()
+        val job = kotlinx.coroutines.CoroutineScope(testDispatcher).launch {
+            viewModel.keyEvent.collect {
+                emittedEvents.add(it)
+            }
+        }
+        testDispatcher.scheduler.runCurrent()
+
+        // When
+        viewModel.onIntent(OcrKeyboardIntent.EnterKeyPressed)
+        testDispatcher.scheduler.runCurrent()
+
+        // Then
+        assertEquals(1, emittedEvents.size)
+        assertEquals(android.view.KeyEvent.KEYCODE_ENTER, emittedEvents.first())
+
+        job.cancel()
+    }
+
+    /**
+     * NextKeyPressedインテントを受信した際にkeyEventが発行されることの検証。
+     *
+     * [事前条件 (Given)]
+     * ViewModelのkeyEventを購読している状態。
+     *
+     * [実行 (When)]
+     * NextKeyPressedインテントを送信する。
+     *
+     * [検証 (Then)]
+     * keyEventにKEYCODE_TAB（61）が発行されること。
+     */
+    @Test
+    fun onIntent_NextKeyPressed_emitsKeyEvent() = runTest {
+        // Given
+        val emittedEvents = mutableListOf<Int>()
+        val job = kotlinx.coroutines.CoroutineScope(testDispatcher).launch {
+            viewModel.keyEvent.collect {
+                emittedEvents.add(it)
+            }
+        }
+        testDispatcher.scheduler.runCurrent()
+
+        // When
+        viewModel.onIntent(OcrKeyboardIntent.NextKeyPressed)
+        testDispatcher.scheduler.runCurrent()
+
+        // Then
+        assertEquals(1, emittedEvents.size)
+        assertEquals(android.view.KeyEvent.KEYCODE_TAB, emittedEvents.first())
+
+        job.cancel()
     }
 }
 
