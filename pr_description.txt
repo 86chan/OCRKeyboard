@@ -1,0 +1,9 @@
+💡 What
+DataStoreに保存・復元される複雑なドメインモデル（`CharReplacement`と`SplitDelimiter`）のエンコード/デコード処理が正確に行われることを保証するためのユニットテストを追加しました。
+また、この調査とテスト実装を通じて得られた知見を`.jules/inspector.md`に記録しました。
+
+🎯 Why
+`SettingsRepository`は、文字の置換ルールや区切り文字のルールを文字列にエンコードして`DataStore<Preferences>`に永続化しています。このロジックにおいて、`isEnabled = false`や`trimSurroundingSpaces = true`といった特定の状態を持つフィールドが、エンコード/デコードの過程で欠落したり初期値で上書きされたりしないことを、実装レベルで厳密に検証するためです。
+
+🛡️ Confidence
+`runTest`と`Flow.first()`を用いて、保存から復元までの完全なデータフローを検証しました。これにより、DataStore経由でドメインオブジェクトを管理する際のサイレントなフィールド欠落（データ破損）バグを将来にわたって防止できます。

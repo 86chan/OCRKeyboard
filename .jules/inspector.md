@@ -8,3 +8,6 @@
 ## 2025-05-19 14:00:00 - [Test Empty Results and Whitespace Trimming]
 **Learning:** When `RecognizeTextUseCase` returns text containing full-width/half-width spaces around a `SplitDelimiter` with `trimSurroundingSpaces = true`, the `OcrKeyboardViewModel` correctly applies a regex substitution to remove those surrounding spaces. It's important to test that both half-width and full-width spaces are effectively trimmed from the resulting string around delimiters.
 **Action:** Always mock combinations of delimiter settings including `trimSurroundingSpaces = true` and `isEnabled = true` to assert that regex-based normalizations within the ViewModel successfully clean up OCR outputs.
+## 2025-05-19 14:15:00 - [Test DataStore Model Encoding]
+**Learning:** When using `DataStore<Preferences>` to store custom domain models (like `CharReplacement` or `SplitDelimiter`) via string encoding/decoding, the conversion logic can silently fail or drop fields if not tested. Ensuring integration tests explicitly write lists with complex state (e.g. `isEnabled = false`, `trimSurroundingSpaces = true`) and read them back via `Flow.first()` guarantees the encode/decode persistence logic works correctly under various conditions.
+**Action:** Always add tests that set complex domain objects and assert they are fully restored from DataStore flows to prevent persistence regressions.
