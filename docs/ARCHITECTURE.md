@@ -12,6 +12,7 @@
    （`OcrKeyboardIntent`）の処理。UI層とドメイン層間のメディエーター機能。
 4. **ドメイン・データ層**: `RecognizeTextUseCase`によるOCRロジックのカプセル化と
    `OcrRepositoryImpl`への委譲。リポジトリによる画像の切り抜きやテキスト抽出などの処理。
+5. **`SettingsRepository`**: DataStoreを用いたアプリケーション設定（スワイプジェスチャーや日本語認識の有効化など）の永続化と、リアクティブなストリームの提供。
 
 ## OCRデータフロー
 
@@ -59,6 +60,11 @@ sequenceDiagram
     Service->>App: currentInputConnection.commitText(text)
     Service->>VM: onIntent(OcrKeyboardIntent.TextCommitted)
     VM->>VM: 状態更新 (テキストのクリア)
+
+    User->>UI: 削除/エンター等のキー操作
+    UI->>VM: onIntent(OcrKeyboardIntent.DeleteKeyPressed など)
+    VM->>Service: emit(keyEvent)
+    Service->>App: currentInputConnection.sendKeyEvent(...)
 ```
 
 ## 単方向データフロー (UDF) アーキテクチャ
@@ -68,6 +74,8 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
+    H[(SettingsRepository)] -->|Flow Boolean| B
+
     A[ユーザー操作] -->|OcrKeyboardIntent| B(OcrKeyboardViewModel)
     B -->|StateFlow OcrKeyboardState| C[OcrKeyboardScreen]
     C -->|UI更新| A
@@ -77,11 +85,14 @@ flowchart TD
     E -->|Result String| D
     D -->|認識結果| B
 
-    B -->|SharedFlow String| F(OcrKeyboardService)
+    B -->|SharedFlow String commitTextEvent| F(OcrKeyboardService)
+    B -->|SharedFlow Int keyEvent| F
     F -->|InputConnection.commitText| G[Target Application]
+    F -->|InputConnection.sendKeyEvent| G
 
     style E fill:#f9f,stroke:#333,stroke-width:2px
     style F fill:#bbf,stroke:#333,stroke-width:2px
+    style H fill:#dfd,stroke:#333,stroke-width:2px
 ```
 
 ## 主要なアーキテクチャ制約

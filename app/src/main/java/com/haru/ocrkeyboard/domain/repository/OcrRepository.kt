@@ -1,5 +1,7 @@
 package com.haru.ocrkeyboard.domain.repository
 
+import com.haru.ocrkeyboard.domain.model.CharReplacement
+
 /**
  * OCRテキスト抽出の要求定義
  *
@@ -17,6 +19,7 @@ interface OcrRepository {
      * @param boxWidthRatio スキャン枠の幅比率
      * @param boxHeightRatio スキャン枠の高さ比率
      * @param boxTopRatio スキャン枠の上部オフセット比率
+     * @param charReplacements OCR後に適用する文字置換ルール一覧
      * @return 抽出された文字列の結果（Result型）
      */
     suspend fun extractText(
@@ -27,6 +30,7 @@ interface OcrRepository {
         viewHeight: Int = 0,
         boxWidthRatio: Float = 0.8f,
         boxHeightRatio: Float = 0.15f,
-        boxTopRatio: Float = 0.05f
+        boxTopRatio: Float = 0.05f,
+        charReplacements: List<CharReplacement> = emptyList(),
     ): Result<String>
 }

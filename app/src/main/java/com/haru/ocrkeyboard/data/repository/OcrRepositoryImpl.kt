@@ -10,6 +10,7 @@ import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.haru.ocrkeyboard.domain.model.CharReplacement
 import com.haru.ocrkeyboard.domain.repository.OcrRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -36,7 +37,7 @@ class OcrRepositoryImpl : OcrRepository {
         TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
     }
 
-/**
+    /**
      * 画像データからのテキスト抽出
      *
      * @param imageBytes 画像データ
@@ -47,6 +48,7 @@ class OcrRepositoryImpl : OcrRepository {
      * @param boxWidthRatio スキャン枠の幅比率
      * @param boxHeightRatio スキャン枠の高さ比率
      * @param boxTopRatio スキャン枠の上部オフセット比率
+     * @param charReplacements OCR後に適用する文字置換ルール一覧
      * @return 抽出結果（Result型）
      */
     override suspend fun extractText(
@@ -57,7 +59,8 @@ class OcrRepositoryImpl : OcrRepository {
         viewHeight: Int,
         boxWidthRatio: Float,
         boxHeightRatio: Float,
-        boxTopRatio: Float
+        boxTopRatio: Float,
+        charReplacements: List<CharReplacement>,
     ): Result<String> = withContext(Dispatchers.Default) {
         // コールバックベースのML Kit APIをコルーチンのデータフローに統合するため、
         // キャンセル処理が正しく伝播するsuspendCancellableCoroutineを使用する
@@ -65,7 +68,7 @@ class OcrRepositoryImpl : OcrRepository {
             try {
                 // 画像全体をメモリに展開するOOMリスクを避けるため、BitmapRegionDecoderを採用する。
                 val decoder = BitmapRegionDecoder.newInstance(imageBytes, 0, imageBytes.size)
-                
+
                 val croppedBitmap = try {
                     val outWidth = decoder.width
                     val outHeight = decoder.height
@@ -113,7 +116,8 @@ class OcrRepositoryImpl : OcrRepository {
                     .addOnSuccessListener { visionText ->
                         if (continuation.isActive) {
                             val sortedText = sortVisionText(visionText)
-                            continuation.resume(Result.success(sortedText))
+                            val normalizedText = normalizeOcrResult(sortedText, charReplacements)
+                            continuation.resume(Result.success(normalizedText))
                         }
                     }
                     .addOnFailureListener { e ->
@@ -168,6 +172,24 @@ class OcrRepositoryImpl : OcrRepository {
             row.joinToString(" ") { it.text }
         }.trim()
     }
+
+    /**
+     * OCR認識結果の文字正規化
+     *
+     * 有効なルールのみを順番に適用する
+     * ルールが空の場合は即時返却（副作用なし）
+     *
+     * @param text 認識済み文字列
+     * @param charReplacements 置換ルール一覧
+     * @return 正規化済み文字列
+     */
+    private fun normalizeOcrResult(
+        text: String,
+        charReplacements: List<CharReplacement>,
+    ): String = charReplacements
+        .filter { it.isEnabled && it.from.isNotEmpty() }
+        // fold でルールを順番に適用することで各ルールが独立して機能する
+        .fold(text) { accumulated, rule -> accumulated.replace(rule.from, rule.to) }
 
     /**
      * 画像からのクロップ領域算出
