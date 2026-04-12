@@ -17,6 +17,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import org.junit.Test
 
 /**
@@ -38,11 +40,11 @@ class OcrKeyboardViewModelTest {
         Dispatchers.setMain(testDispatcher)
         mockRepository = MockOcrRepository()
         val useCase = RecognizeTextUseCase(mockRepository)
-        val mockSettings = org.mockito.Mockito.mock(com.haru.ocrkeyboard.data.local.SettingsRepository::class.java)
-        org.mockito.Mockito.`when`(mockSettings.charReplacementsFlow).thenReturn(kotlinx.coroutines.flow.flowOf(emptyList()))
-        org.mockito.Mockito.`when`(mockSettings.splitDelimitersFlow).thenReturn(kotlinx.coroutines.flow.flowOf(emptyList()))
-        org.mockito.Mockito.`when`(mockSettings.useSwipeGestureFlow).thenReturn(kotlinx.coroutines.flow.flowOf(false))
-        org.mockito.Mockito.`when`(mockSettings.useJapaneseRecognitionFlow).thenReturn(kotlinx.coroutines.flow.flowOf(false))
+        val mockSettings = mock(com.haru.ocrkeyboard.data.local.SettingsRepository::class.java)
+        `when`(mockSettings.charReplacementsFlow).thenReturn(kotlinx.coroutines.flow.flowOf(emptyList()))
+        `when`(mockSettings.splitDelimitersFlow).thenReturn(kotlinx.coroutines.flow.flowOf(emptyList()))
+        `when`(mockSettings.useSwipeGestureFlow).thenReturn(kotlinx.coroutines.flow.flowOf(false))
+        `when`(mockSettings.useJapaneseRecognitionFlow).thenReturn(kotlinx.coroutines.flow.flowOf(false))
 
         viewModel = OcrKeyboardViewModel(useCase, mockSettings)
     }
@@ -50,6 +52,41 @@ class OcrKeyboardViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    /**
+     * 区切り文字の前後空白トリム設定が有効な場合、認識結果の区切り文字周辺の空白が除去されることの検証。
+     *
+     * [事前条件 (Given)]
+     * 区切り文字「-」のtrimSurroundingSpacesがtrueに設定されたViewModelが存在する。
+     * モックリポジトリが「 123  -  456　- 789 」（半角・全角空白混じり）を返すように設定。
+     *
+     * [実行 (When)]
+     * RecognizeTextインテントを送信し、コルーチンを完了させる。
+     *
+     * [検証 (Then)]
+     * 状態のrecognizedTextが「 123-456-789 」（区切り文字周辺の空白のみ除去）になること。
+     */
+    @Test
+    fun onIntent_RecognizeText_withTrimSurroundingSpaces_removesSpacesAroundDelimiter() = runTest {
+        // Given
+        val mockSettings = mock(com.haru.ocrkeyboard.data.local.SettingsRepository::class.java)
+        `when`(mockSettings.charReplacementsFlow).thenReturn(kotlinx.coroutines.flow.flowOf(emptyList()))
+        val delimiter = com.haru.ocrkeyboard.domain.model.SplitDelimiter("-", isEnabled = true, trimSurroundingSpaces = true)
+        `when`(mockSettings.splitDelimitersFlow).thenReturn(kotlinx.coroutines.flow.flowOf(listOf(delimiter)))
+        `when`(mockSettings.useSwipeGestureFlow).thenReturn(kotlinx.coroutines.flow.flowOf(false))
+        `when`(mockSettings.useJapaneseRecognitionFlow).thenReturn(kotlinx.coroutines.flow.flowOf(false))
+
+        val customViewModel = OcrKeyboardViewModel(RecognizeTextUseCase(mockRepository), mockSettings)
+
+        mockRepository.mockResult = Result.success(" 123  -  456　- 789 ")
+
+        // When
+        customViewModel.onIntent(OcrKeyboardIntent.RecognizeText(byteArrayOf(1), 0))
+        testDispatcher.scheduler.runCurrent()
+
+        // Then
+        assertEquals(" 123-456-789 ", customViewModel.state.value.recognizedText)
     }
 
     /**
