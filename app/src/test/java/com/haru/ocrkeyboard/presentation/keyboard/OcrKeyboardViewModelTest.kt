@@ -138,6 +138,35 @@ class OcrKeyboardViewModelTest {
     }
 
     /**
+     * RecognizeTextインテントを受信して認識結果が空文字だった場合、
+     * エラーメッセージがStateに反映されることの検証。
+     *
+     * [事前条件 (Given)]
+     * モックリポジトリが空文字を返すように設定。
+     *
+     * [実行 (When)]
+     * RecognizeTextインテントを送信し、コルーチンを完了させる。
+     *
+     * [検証 (Then)]
+     * 状態のerrorMessageにエラー内容が含まれること。
+     * isRecognizingがfalseに戻ること。
+     */
+    @Test
+    fun onIntent_RecognizeText_emptyResult_updatesErrorState() = runTest {
+        // Given
+        mockRepository.mockResult = Result.success("")
+
+        // When
+        viewModel.onIntent(OcrKeyboardIntent.RecognizeText(byteArrayOf(1), 0))
+        testDispatcher.scheduler.runCurrent()
+
+        // Then
+        val state = viewModel.state.value
+        assertFalse(state.isRecognizing)
+        assertEquals("テキストが検出されませんでした", state.errorMessage)
+    }
+
+    /**
      * TextCommittedインテントを受信した際にテキストがクリアされることの検証。
      *
      * [事前条件 (Given)]
