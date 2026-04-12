@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,9 +58,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -68,6 +75,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.haru.ocrkeyboard.data.local.SettingsRepository
 import com.haru.ocrkeyboard.domain.model.CharReplacement
+import com.haru.ocrkeyboard.domain.model.SplitDelimiter
 import com.haru.ocrkeyboard.ui.theme.OCRKeyboardTheme
 import kotlinx.coroutines.launch
 
@@ -107,12 +115,14 @@ class MainActivity : ComponentActivity() {
 fun TestInputScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val focusManager = LocalFocusManager.current
     val settingsRepository = remember { SettingsRepository(context) }
     val scope = rememberCoroutineScope()
 
     var text by remember { mutableStateOf("") }
     val useSwipeGesture by settingsRepository.useSwipeGestureFlow.collectAsStateWithLifecycle(initialValue = false)
     val useJapanese by settingsRepository.useJapaneseRecognitionFlow.collectAsStateWithLifecycle(initialValue = false)
+    val splitDelimiters by settingsRepository.splitDelimitersFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     val charReplacements by settingsRepository.charReplacementsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
 
     // カメラ権限の状態管理
@@ -150,6 +160,11 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {
+                    focusManager.clearFocus()
+                })
+            }
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.Top
@@ -303,6 +318,15 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
+        SplitDelimiterSection(
+            delimiters = splitDelimiters,
+            onDelimitersChanged = { updated ->
+                scope.launch { settingsRepository.setSplitDelimiters(updated) }
+            }
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
         CharReplacementSection(
             replacements = charReplacements,
             onReplacementsChanged = { updated ->
@@ -332,6 +356,182 @@ fun TestInputScreen(modifier: Modifier = Modifier) {
             singleLine = false,
             maxLines = 5
         )
+    }
+}
+
+/**
+ * 区切り文字設定セクション
+ *
+ * 各ルールの有効/無効・文字・前後空白削除有無・削除ボタンをリスト表示し、
+ * 追加ボタンで新規ルールを末尾に追加できる
+ *
+ * @param delimiters 現在の区切り文字ルール一覧
+ * @param onDelimitersChanged ルールが変更されたときのコールバック
+ */
+@Composable
+private fun SplitDelimiterSection(
+    delimiters: List<SplitDelimiter>,
+    onDelimitersChanged: (List<SplitDelimiter>) -> Unit,
+) {
+    Text(
+        text = "区切り文字（入力候補の分割に使用）",
+        style = MaterialTheme.typography.titleMedium
+    )
+    Text(
+        text = "認識されたテキストをこの文字で分割し、複数の入力候補を生成します。",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    delimiters.forEachIndexed { index, rule ->
+        SplitDelimiterRow(
+            rule = rule,
+            onEnabledChanged = { isEnabled ->
+                onDelimitersChanged(
+                    delimiters.toMutableList().also { it[index] = rule.copy(isEnabled = isEnabled) }
+                )
+            },
+            onCharChanged = { char ->
+                onDelimitersChanged(
+                    delimiters.toMutableList().also { it[index] = rule.copy(char = char) }
+                )
+            },
+            onTrimSpacesChanged = { trim ->
+                onDelimitersChanged(
+                    delimiters.toMutableList().also { it[index] = rule.copy(trimSurroundingSpaces = trim) }
+                )
+            },
+            onDelete = {
+                onDelimitersChanged(delimiters.toMutableList().also { it.removeAt(index) })
+            },
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+    }
+
+    Spacer(modifier = Modifier.height(8.dp))
+
+    OutlinedButton(
+        onClick = {
+            onDelimitersChanged(delimiters + SplitDelimiter(char = "", isEnabled = true))
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(Icons.Default.Add, contentDescription = null)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("追加")
+    }
+}
+
+/**
+ * 区切り文字ルール1行分のUI
+ *
+ * @param rule 表示対象のルール
+ * @param onEnabledChanged 有効/無効変更時のコールバック
+ * @param onCharChanged 文字変更時（フォーカスアウト時）のコールバック
+ * @param onTrimSpacesChanged 前後空白除去の有効/無効変更時のコールバック
+ * @param onDelete 削除ボタン押下時のコールバック
+ */
+@Composable
+private fun SplitDelimiterRow(
+    rule: SplitDelimiter,
+    onEnabledChanged: (Boolean) -> Unit,
+    onCharChanged: (String) -> Unit,
+    onTrimSpacesChanged: (Boolean) -> Unit,
+    onDelete: () -> Unit,
+) {
+    var charText by remember(rule.char) { mutableStateOf(rule.char) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = { Text("ルールの削除") },
+            text = { Text("この区切り文字ルールを削除しますか？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        onDelete()
+                    }
+                ) {
+                    Text("削除")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteConfirmDialog = false }
+                ) {
+                    Text("キャンセル")
+                }
+            }
+        )
+    }
+
+    val disabledAlpha = 0.38f
+    val contentAlpha = if (rule.isEnabled) 1f else disabledAlpha
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(
+            checked = rule.isEnabled,
+            onCheckedChange = onEnabledChanged,
+        )
+
+        OutlinedTextField(
+            value = charText,
+            onValueChange = { newValue ->
+                charText = newValue
+            },
+            modifier = Modifier
+                .width(80.dp)
+                .padding(end = 8.dp)
+                .onFocusChanged { focusState ->
+                    if (!focusState.isFocused) {
+                        val formattedChar = if (charText.isNotEmpty()) charText.take(1) else ""
+                        if (charText != formattedChar) {
+                            charText = formattedChar
+                        }
+                        if (formattedChar != rule.char) {
+                            onCharChanged(formattedChar)
+                        }
+                    }
+                },
+            visualTransformation = spaceVisibleTransformation,
+            singleLine = true,
+            enabled = rule.isEnabled,
+            placeholder = { Text("記号") },
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
+            ),
+        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Checkbox(
+                checked = rule.trimSurroundingSpaces,
+                onCheckedChange = onTrimSpacesChanged,
+                enabled = rule.isEnabled,
+            )
+            Text(
+                text = "前後空白を除去",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
+            )
+        }
+
+        IconButton(onClick = { showDeleteConfirmDialog = true }) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "削除",
+                tint = MaterialTheme.colorScheme.error,
+            )
+        }
     }
 }
 
@@ -473,6 +673,7 @@ private fun CharReplacementRow(
                         onFromChanged(fromText)
                     }
                 },
+            visualTransformation = spaceVisibleTransformation,
             label = { Text("認識") },
             singleLine = true,
             enabled = rule.isEnabled,
@@ -497,6 +698,7 @@ private fun CharReplacementRow(
                         onToChanged(toText)
                     }
                 },
+            visualTransformation = spaceVisibleTransformation,
             label = { Text("置換後") },
             singleLine = true,
             enabled = rule.isEnabled,
@@ -560,4 +762,12 @@ private fun CharReplacementSectionEmptyPreview() {
             )
         }
     }
+}
+
+/**
+ * 半角・全角スペースを入力欄で可視化するためのVisualTransformation
+ */
+private val spaceVisibleTransformation = VisualTransformation { text ->
+    val transformed = text.text.replace(" ", "␣").replace("　", "▢")
+    TransformedText(AnnotatedString(transformed), OffsetMapping.Identity)
 }

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.haru.ocrkeyboard.domain.model.CharReplacement
+import com.haru.ocrkeyboard.domain.model.SplitDelimiter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -35,6 +36,9 @@ class SettingsRepository(private val context: Context) {
         /** 文字置換ルール一覧の保存キー */
         val CHAR_REPLACEMENTS = stringPreferencesKey("char_replacements")
 
+        /** 区切り文字ルール一覧の保存キー */
+        val SPLIT_DELIMITERS = stringPreferencesKey("split_delimiters")
+
         /**
          * デフォルトの置換ルール
          *
@@ -43,6 +47,15 @@ class SettingsRepository(private val context: Context) {
         val DEFAULT_REPLACEMENTS = listOf(
             CharReplacement(from = "Ø", to = "0", isEnabled = true),
             CharReplacement(from = "ø", to = "0", isEnabled = true),
+        )
+
+        /**
+         * デフォルトの区切り文字ルール
+         */
+        val DEFAULT_SPLIT_DELIMITERS = listOf(
+            SplitDelimiter(char = "-", isEnabled = true, trimSurroundingSpaces = true),
+            SplitDelimiter(char = " ", isEnabled = true, trimSurroundingSpaces = false),
+            SplitDelimiter(char = "　", isEnabled = true, trimSurroundingSpaces = false),
         )
 
         /**
@@ -80,6 +93,40 @@ class SettingsRepository(private val context: Context) {
                     isEnabled = enabledStr == "1",
                 )
             }
+
+        /**
+         * `List<SplitDelimiter>` からDataStore保存用文字列へのエンコード
+         *
+         * フォーマット: `"1|1|-"` (isEnabled|trimSurroundingSpaces|char、改行区切り)
+         *
+         * @param list 区切り文字ルール一覧
+         * @return エンコード済み文字列
+         */
+        fun encodeSplitDelimiters(list: List<SplitDelimiter>): String = list.joinToString("\n") { rule ->
+            val enabled = if (rule.isEnabled) "1" else "0"
+            val trimSpaces = if (rule.trimSurroundingSpaces) "1" else "0"
+            "$enabled|$trimSpaces|${rule.char}"
+        }
+
+        /**
+         * DataStore保存用文字列から `List<SplitDelimiter>` へのデコード
+         *
+         * @param raw エンコード済み文字列
+         * @return 区切り文字ルール一覧
+         */
+        fun decodeSplitDelimiters(raw: String): List<SplitDelimiter> = raw
+            .split("\n")
+            .filter { it.isNotBlank() }
+            .mapNotNull { record ->
+                val parts = record.split("|", limit = 3)
+                if (parts.size != 3) return@mapNotNull null
+                val (enabledStr, trimStr, char) = parts
+                SplitDelimiter(
+                    char = char,
+                    isEnabled = enabledStr == "1",
+                    trimSurroundingSpaces = trimStr == "1",
+                )
+            }
     }
 
     /**
@@ -115,6 +162,18 @@ class SettingsRepository(private val context: Context) {
         }
 
     /**
+     * 区切り文字ルール一覧のストリーム
+     *
+     * 未設定時はデフォルトのルール（-・半角スペース・全角スペース）を返す
+     */
+    val splitDelimitersFlow: Flow<List<SplitDelimiter>> = context.dataStore.data
+        .map { preferences ->
+            preferences[SPLIT_DELIMITERS]
+                ?.let { decodeSplitDelimiters(it) }
+                ?: DEFAULT_SPLIT_DELIMITERS
+        }
+
+    /**
      * スワイプジェスチャー設定の更新
      *
      * @param isEnabled 有効化フラグ
@@ -144,6 +203,17 @@ class SettingsRepository(private val context: Context) {
     suspend fun setCharReplacements(list: List<CharReplacement>) {
         context.dataStore.edit { preferences ->
             preferences[CHAR_REPLACEMENTS] = encode(list)
+        }
+    }
+
+    /**
+     * 区切り文字ルール一覧の更新
+     *
+     * @param list 更新後の区切り文字ルール一覧
+     */
+    suspend fun setSplitDelimiters(list: List<SplitDelimiter>) {
+        context.dataStore.edit { preferences ->
+            preferences[SPLIT_DELIMITERS] = encodeSplitDelimiters(list)
         }
     }
 }

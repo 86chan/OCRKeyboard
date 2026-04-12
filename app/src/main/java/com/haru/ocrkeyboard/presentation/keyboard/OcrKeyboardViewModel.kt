@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.haru.ocrkeyboard.data.local.SettingsRepository
 import com.haru.ocrkeyboard.domain.model.CharReplacement
+import com.haru.ocrkeyboard.domain.model.SplitDelimiter
 import com.haru.ocrkeyboard.domain.usecase.RecognizeTextUseCase
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +62,11 @@ class OcrKeyboardViewModel(
         viewModelScope.launch {
             settingsRepository.charReplacementsFlow.collect { replacements ->
                 _state.update { it.copy(charReplacements = replacements) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.splitDelimitersFlow.collect { delimiters ->
+                _state.update { it.copy(splitDelimiters = delimiters) }
             }
         }
     }
@@ -163,9 +169,14 @@ class OcrKeyboardViewModel(
                 charReplacements = charReplacements,
             )
             result.onSuccess { rawText ->
-                val text = rawText.replace(Regex("[\\s　]*-[\\s　]*"), "-")
+                val text = _state.value.splitDelimiters
+                    .filter { it.isEnabled && it.trimSurroundingSpaces && it.char.length == 1 }
+                    .fold(rawText) { acc, delimiter ->
+                        acc.replace(Regex("[\\s　]*${Regex.escape(delimiter.char)}[\\s　]*"), delimiter.char)
+                    }
+
                 if (text.isNotBlank()) {
-                    val candidates = generateCandidates(text)
+                    val candidates = generateCandidates(text, _state.value.splitDelimiters)
                     _state.update { 
                         it.copy(
                             isRecognizing = false, 
@@ -195,13 +206,18 @@ class OcrKeyboardViewModel(
      * 区切り文字に基づく文字列分割および結合パターンの作成
      *
      * @param text 認識された文字列
+     * @param delimiters 分割ルール一覧
      * @return 候補文字列リスト
      */
-    private fun generateCandidates(text: String): List<String> {
-        val delimiters = charArrayOf('-', ' ', '　')
-        if (!text.any { it in delimiters }) return emptyList()
+    private fun generateCandidates(text: String, delimiters: List<SplitDelimiter>): List<String> {
+        val activeChars = delimiters
+            .filter { it.isEnabled && it.char.length == 1 }
+            .map { it.char[0] }
+            .toCharArray()
 
-        val parts = text.split(*delimiters).filter { it.isNotBlank() }
+        if (activeChars.isEmpty() || !text.any { it in activeChars }) return emptyList()
+
+        val parts = text.split(*activeChars).filter { it.isNotBlank() }
         if (parts.size <= 1) return emptyList()
 
         val joined = parts.joinToString("")
