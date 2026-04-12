@@ -1,5 +1,7 @@
 package com.haru.ocrkeyboard.presentation.keyboard
 
+import com.haru.ocrkeyboard.domain.model.CharReplacement
+
 /**
  * OCRキーボードのUI状態
  *
@@ -10,6 +12,7 @@ package com.haru.ocrkeyboard.presentation.keyboard
  * @property errorMessage エラーメッセージ（null時はエラーなし）
  * @property useSwipeGesture リサイズにスワイプを使用するか（設定値）
  * @property useJapanese 日本語文字認識を使用するか（設定値）
+ * @property charReplacements OCR後処理の文字置換ルール一覧（設定値）
  */
 data class OcrKeyboardState(
     val isCameraReady: Boolean = false,
@@ -18,5 +21,6 @@ data class OcrKeyboardState(
     val suggestionCandidates: List<String> = emptyList(),
     val errorMessage: String? = null,
     val useSwipeGesture: Boolean = false,
-    val useJapanese: Boolean = false
+    val useJapanese: Boolean = false,
+    val charReplacements: List<CharReplacement> = emptyList(),
 )

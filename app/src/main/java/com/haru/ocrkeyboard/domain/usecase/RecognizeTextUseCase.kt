@@ -1,5 +1,6 @@
 package com.haru.ocrkeyboard.domain.usecase
 
+import com.haru.ocrkeyboard.domain.model.CharReplacement
 import com.haru.ocrkeyboard.domain.repository.OcrRepository
 
 /**
@@ -25,6 +26,7 @@ class RecognizeTextUseCase(
      * @param boxWidthRatio スキャン枠幅比率
      * @param boxHeightRatio スキャン枠高さ比率
      * @param boxTopRatio スキャン枠上部比率
+     * @param charReplacements OCR後に適用する文字置換ルール一覧
      * @return 認識結果のResult型文字列
      */
     suspend operator fun invoke(
@@ -35,20 +37,22 @@ class RecognizeTextUseCase(
         viewHeight: Int = 0,
         boxWidthRatio: Float = 0.8f,
         boxHeightRatio: Float = 0.15f,
-        boxTopRatio: Float = 0.05f
+        boxTopRatio: Float = 0.05f,
+        charReplacements: List<CharReplacement> = emptyList(),
     ): Result<String> {
         if (imageBytes.isEmpty()) {
             return Result.failure(IllegalArgumentException("Empty image data"))
         }
         return ocrRepository.extractText(
-            imageBytes,
-            rotationDegrees,
-            useJapanese,
-            viewWidth,
-            viewHeight,
-            boxWidthRatio,
-            boxHeightRatio,
-            boxTopRatio
+            imageBytes = imageBytes,
+            rotationDegrees = rotationDegrees,
+            useJapanese = useJapanese,
+            viewWidth = viewWidth,
+            viewHeight = viewHeight,
+            boxWidthRatio = boxWidthRatio,
+            boxHeightRatio = boxHeightRatio,
+            boxTopRatio = boxTopRatio,
+            charReplacements = charReplacements,
         )
     }
 }

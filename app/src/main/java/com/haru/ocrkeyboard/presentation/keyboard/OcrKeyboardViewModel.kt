@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.haru.ocrkeyboard.data.local.SettingsRepository
+import com.haru.ocrkeyboard.domain.model.CharReplacement
 import com.haru.ocrkeyboard.domain.usecase.RecognizeTextUseCase
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
 
 /**
  * OCRキーボードのバックエンド状態管理
@@ -56,6 +58,11 @@ class OcrKeyboardViewModel(
                 _state.update { it.copy(useJapanese = isEnabled) }
             }
         }
+        viewModelScope.launch {
+            settingsRepository.charReplacementsFlow.collect { replacements ->
+                _state.update { it.copy(charReplacements = replacements) }
+            }
+        }
     }
 
     /**
@@ -80,7 +87,8 @@ class OcrKeyboardViewModel(
                     viewHeight = intent.viewHeight,
                     boxWidthRatio = intent.boxWidthRatio,
                     boxHeightRatio = intent.boxHeightRatio,
-                    boxTopRatio = intent.boxTopRatio
+                    boxTopRatio = intent.boxTopRatio,
+                    charReplacements = _state.value.charReplacements,
                 )
             }
             is OcrKeyboardIntent.DismissError -> {
@@ -125,6 +133,7 @@ class OcrKeyboardViewModel(
      * @param boxWidthRatio スキャン枠幅比率
      * @param boxHeightRatio スキャン枠高さ比率
      * @param boxTopRatio スキャン枠上部比率
+     * @param charReplacements OCR後に適用する文字置換ルール一覧
      */
     private fun recognizeImage(
         imageBytes: ByteArray,
@@ -134,7 +143,8 @@ class OcrKeyboardViewModel(
         viewHeight: Int,
         boxWidthRatio: Float,
         boxHeightRatio: Float,
-        boxTopRatio: Float
+        boxTopRatio: Float,
+        charReplacements: List<CharReplacement>,
     ) {
         if (_state.value.isRecognizing) return
         
@@ -149,7 +159,8 @@ class OcrKeyboardViewModel(
                 viewHeight = viewHeight,
                 boxWidthRatio = boxWidthRatio,
                 boxHeightRatio = boxHeightRatio,
-                boxTopRatio = boxTopRatio
+                boxTopRatio = boxTopRatio,
+                charReplacements = charReplacements,
             )
             result.onSuccess { text ->
                 if (text.isNotBlank()) {
