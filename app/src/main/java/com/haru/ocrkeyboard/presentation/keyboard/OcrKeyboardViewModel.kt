@@ -162,7 +162,8 @@ class OcrKeyboardViewModel(
                 boxTopRatio = boxTopRatio,
                 charReplacements = charReplacements,
             )
-            result.onSuccess { text ->
+            result.onSuccess { rawText ->
+                val text = rawText.replace(Regex("[\\s　]*-[\\s　]*"), "-")
                 if (text.isNotBlank()) {
                     val candidates = generateCandidates(text)
                     _state.update { 
@@ -204,7 +205,7 @@ class OcrKeyboardViewModel(
         if (parts.size <= 1) return emptyList()
 
         val joined = parts.joinToString("")
-        return listOf(joined) + parts
+        return listOf(text, joined) + parts
     }
 
     /**
