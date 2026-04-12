@@ -120,7 +120,7 @@ class MockOcrRepository : OcrRepository {
         viewHeight: Int,
         boxWidthRatio: Float,
         boxHeightRatio: Float,
-        boxTopRatio: Float
+        boxTopRatio: Float, charReplacements: List<com.haru.ocrkeyboard.domain.model.CharReplacement>
     ): Result<String> {
         callCount++
         return mockResult

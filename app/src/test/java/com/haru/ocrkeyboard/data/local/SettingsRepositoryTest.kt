@@ -2,6 +2,8 @@ package com.haru.ocrkeyboard.data.local
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.haru.ocrkeyboard.domain.model.CharReplacement
+import com.haru.ocrkeyboard.domain.model.SplitDelimiter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -82,5 +84,39 @@ class SettingsRepositoryTest {
         settingsRepository.setUseJapaneseRecognition(false)
         val useJapaneseFalse = settingsRepository.useJapaneseRecognitionFlow.first()
         assertEquals(false, useJapaneseFalse)
+    }
+
+    /**
+     * 文字置換ルール一覧更新の検証
+     *
+     * 複数ルールの設定と無効化状態を含めて正しく保存・復元（エンコード・デコード）されることを確認
+     */
+    @Test
+    fun setCharReplacements_updatesValueAndCorrectlyEncodesDecodes() = runTest {
+        val rules = listOf(
+            CharReplacement(from = "A", to = "B", isEnabled = true),
+            CharReplacement(from = "C", to = "D", isEnabled = false)
+        )
+        settingsRepository.setCharReplacements(rules)
+
+        val retrieved = settingsRepository.charReplacementsFlow.first()
+        assertEquals(rules, retrieved)
+    }
+
+    /**
+     * 区切り文字ルール一覧更新の検証
+     *
+     * 複数ルールの設定と無効化・空白トリム状態を含めて正しく保存・復元（エンコード・デコード）されることを確認
+     */
+    @Test
+    fun setSplitDelimiters_updatesValueAndCorrectlyEncodesDecodes() = runTest {
+        val delimiters = listOf(
+            SplitDelimiter(char = "-", isEnabled = true, trimSurroundingSpaces = true),
+            SplitDelimiter(char = "_", isEnabled = false, trimSurroundingSpaces = false)
+        )
+        settingsRepository.setSplitDelimiters(delimiters)
+
+        val retrieved = settingsRepository.splitDelimitersFlow.first()
+        assertEquals(delimiters, retrieved)
     }
 }
