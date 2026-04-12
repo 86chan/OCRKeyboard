@@ -38,8 +38,14 @@ class OcrKeyboardViewModelTest {
         mockRepository = MockOcrRepository()
         val useCase = RecognizeTextUseCase(mockRepository)
         val mockSettings = org.mockito.Mockito.mock(com.haru.ocrkeyboard.data.local.SettingsRepository::class.java)
-        org.mockito.Mockito.`when`(mockSettings.useSwipeGestureFlow).thenReturn(kotlinx.coroutines.flow.emptyFlow())
-        org.mockito.Mockito.`when`(mockSettings.useJapaneseRecognitionFlow).thenReturn(kotlinx.coroutines.flow.emptyFlow())
+        org.mockito.Mockito.`when`(mockSettings.charReplacementsFlow).thenReturn(kotlinx.coroutines.flow.flowOf(emptyList()))
+        org.mockito.Mockito.`when`(mockSettings.splitDelimitersFlow).thenReturn(kotlinx.coroutines.flow.flowOf(emptyList()))
+        org.mockito.Mockito.`when`(mockSettings.useSwipeGestureFlow).thenReturn(kotlinx.coroutines.flow.flowOf(false))
+        org.mockito.Mockito.`when`(mockSettings.useJapaneseRecognitionFlow).thenReturn(kotlinx.coroutines.flow.flowOf(false))
+
+
+
+
         viewModel = OcrKeyboardViewModel(useCase, mockSettings)
     }
 
@@ -173,7 +179,7 @@ class MockOcrRepository : OcrRepository {
         viewHeight: Int,
         boxWidthRatio: Float,
         boxHeightRatio: Float,
-        boxTopRatio: Float
+        boxTopRatio: Float, charReplacements: List<com.haru.ocrkeyboard.domain.model.CharReplacement>
     ): Result<String> {
         return mockResult
     }
